@@ -76,19 +76,17 @@ model VerificationToken {
 // =========================
 
 model Availability {
-  id             String  @id @default(cuid())
-  userId         String  @unique
-  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   // 各曜日の稼働時間。{ mon: { start: "10:00", end: "18:00" }, sun: null, ... }
-  weeklyHours    Json
-  skipHolidays   Boolean @default(true)
-  defaultSlotMin Int     @default(60)
-  bufferMinutes  Int     @default(15)
+  weeklyHours  Json
+  skipHolidays Boolean @default(true)
 
-  exceptions     AvailabilityException[]
+  exceptions   AvailabilityException[]
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model AvailabilityException {
