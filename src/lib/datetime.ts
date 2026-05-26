@@ -1,4 +1,5 @@
 import { fromZonedTime, toZonedTime, formatInTimeZone } from "date-fns-tz";
+import type { Locale } from "date-fns";
 
 export const JST = "Asia/Tokyo" as const;
 
@@ -17,5 +18,14 @@ export const endOfJstDay = (date: Date | string): Date => {
   return fromZonedTime(d, JST);
 };
 
-export const formatJst = (date: Date | string, fmt: string): string =>
-  formatInTimeZone(typeof date === "string" ? new Date(date) : date, JST, fmt);
+export const formatJst = (
+  date: Date | string,
+  fmt: string,
+  options?: { locale?: Locale },
+): string =>
+  formatInTimeZone(
+    typeof date === "string" ? new Date(date) : date,
+    JST,
+    fmt,
+    options,
+  );

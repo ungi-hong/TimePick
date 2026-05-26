@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { endOfJstDay, formatJst, startOfJstDay } from "@/lib/datetime";
 import { useBusyEvents, type BusyEvent } from "@/lib/use-busy-events";
+import { useProposals, type ProposalSlotEntry } from "@/lib/use-proposals";
 
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -38,20 +39,36 @@ const weekdayColor = (dayOfWeek: number) => {
   return "text-foreground";
 };
 
-const eventsOverlappingDay = (date: Date, events: BusyEvent[]) => {
+type CellEvent =
+  | {
+      type: "busy";
+      start: string;
+      end: string;
+      summary: string;
+      allDay: boolean;
+      key: string;
+    }
+  | {
+      type: "proposal";
+      start: string;
+      end: string;
+      label: string;
+      proposalId: string;
+      key: string;
+    };
+
+const overlapsDay = (event: { start: string; end: string }, date: Date) => {
   const dayStart = startOfJstDay(date).getTime();
   const dayEnd = endOfJstDay(date).getTime();
-  return events.filter((e) => {
-    const s = new Date(e.start).getTime();
-    const en = new Date(e.end).getTime();
-    return s < dayEnd && en > dayStart;
-  });
+  const s = new Date(event.start).getTime();
+  const e = new Date(event.end).getTime();
+  return s < dayEnd && e > dayStart;
 };
 
 type DayCellProps = {
   date: Date;
   cursor: Date;
-  events: BusyEvent[];
+  events: CellEvent[];
   selected: boolean;
   onSelect: (d: Date) => void;
 };
@@ -60,7 +77,10 @@ function DayCell({ date, cursor, events, selected, onSelect }: DayCellProps) {
   const inMonth = isSameMonth(date, cursor);
   const today = isToday(date);
   const dow = getDay(date);
-  const dayEvents = useMemo(() => eventsOverlappingDay(date, events), [date, events]);
+  const dayEvents = useMemo(
+    () => events.filter((e) => overlapsDay(e, date)),
+    [date, events],
+  );
 
   return (
     <Popover>
@@ -82,15 +102,23 @@ function DayCell({ date, cursor, events, selected, onSelect }: DayCellProps) {
           {date.getDate()}
         </span>
         <div className="flex flex-col gap-0.5">
-          {dayEvents.slice(0, 2).map((e, i) => (
+          {dayEvents.slice(0, 2).map((e) => (
             <span
-              key={`${e.googleEventId}-${i}`}
-              className="truncate rounded bg-zinc-200 px-1 text-[10px] leading-4 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"
-              title={e.summary}
+              key={e.key}
+              className={cn(
+                "truncate rounded px-1 text-[10px] leading-4",
+                e.type === "busy" &&
+                  "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200",
+                e.type === "proposal" &&
+                  "bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-100",
+              )}
+              title={e.type === "busy" ? e.summary : e.label}
             >
-              {e.allDay
-                ? `終日 ${e.summary}`
-                : `${formatJst(e.start, "HH:mm")} ${e.summary}`}
+              {e.type === "busy"
+                ? e.allDay
+                  ? `終日 ${e.summary}`
+                  : `${formatJst(e.start, "HH:mm")} ${e.summary}`
+                : `候 ${formatJst(e.start, "HH:mm")}–${formatJst(e.end, "HH:mm")} ${e.label}`}
             </span>
           ))}
           {dayEvents.length > 2 && (
@@ -112,14 +140,21 @@ function DayCell({ date, cursor, events, selected, onSelect }: DayCellProps) {
           </p>
         ) : (
           <ul className="flex flex-col gap-1.5">
-            {dayEvents.map((e, i) => (
+            {dayEvents.map((e) => (
               <li
-                key={`${e.googleEventId}-${i}`}
-                className="flex flex-col gap-0.5 rounded border bg-card px-2 py-1.5"
+                key={e.key}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded border px-2 py-1.5",
+                  e.type === "busy" && "bg-card",
+                  e.type === "proposal" &&
+                    "border-amber-300 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30",
+                )}
               >
-                <span className="text-xs font-medium">{e.summary}</span>
+                <span className="text-xs font-medium">
+                  {e.type === "busy" ? e.summary : `候補: ${e.label}`}
+                </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {e.allDay
+                  {e.type === "busy" && e.allDay
                     ? "終日"
                     : `${formatJst(e.start, "HH:mm")} – ${formatJst(e.end, "HH:mm")}`}
                 </span>
@@ -138,6 +173,33 @@ type Props = {
   onSelectedDateChange: (date: Date) => void;
 };
 
+const toCellEvent = (
+  e: BusyEvent | ProposalSlotEntry,
+  type: "busy" | "proposal",
+  index: number,
+): CellEvent => {
+  if (type === "busy") {
+    const b = e as BusyEvent;
+    return {
+      type: "busy",
+      start: b.start,
+      end: b.end,
+      summary: b.summary,
+      allDay: b.allDay,
+      key: `busy-${b.googleEventId}-${index}`,
+    };
+  }
+  const p = e as ProposalSlotEntry;
+  return {
+    type: "proposal",
+    start: p.start,
+    end: p.end,
+    label: p.label,
+    proposalId: p.proposalId,
+    key: `proposal-${p.slotId}`,
+  };
+};
+
 export function MonthCalendar({
   calendarConnected,
   selectedDate,
@@ -148,22 +210,39 @@ export function MonthCalendar({
   const { gridStart, gridEnd, days } = useMemo(() => {
     const monthStart = startOfMonth(cursor);
     const monthEnd = endOfMonth(cursor);
-    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-    const days: Date[] = [];
-    let d = gridStart;
-    while (d <= gridEnd) {
-      days.push(d);
+    const gs = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const ge = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const list: Date[] = [];
+    let d = gs;
+    while (d <= ge) {
+      list.push(d);
       d = addDays(d, 1);
     }
-    return { gridStart, gridEnd, days };
+    return { gridStart: gs, gridEnd: ge, days: list };
   }, [cursor]);
 
-  const { data: events = [], isLoading, error } = useBusyEvents({
-    from: startOfJstDay(gridStart),
-    to: endOfJstDay(gridEnd),
-    enabled: calendarConnected,
+  const from = useMemo(() => startOfJstDay(gridStart), [gridStart]);
+  const to = useMemo(() => endOfJstDay(gridEnd), [gridEnd]);
+
+  const {
+    data: busy = [],
+    isLoading: loadingBusy,
+    error: busyError,
+  } = useBusyEvents({ from, to, enabled: calendarConnected });
+
+  const { data: proposals = [] } = useProposals({
+    from,
+    to,
+    status: "OPEN",
   });
+
+  const cellEvents: CellEvent[] = useMemo(
+    () => [
+      ...busy.map((b, i) => toCellEvent(b, "busy", i)),
+      ...proposals.map((p, i) => toCellEvent(p, "proposal", i)),
+    ],
+    [busy, proposals],
+  );
 
   const goPrev = () => onSelectedDateChange(subMonths(selectedDate, 1));
   const goNext = () => onSelectedDateChange(addMonths(selectedDate, 1));
@@ -220,21 +299,21 @@ export function MonthCalendar({
             key={day.toISOString()}
             date={day}
             cursor={cursor}
-            events={events}
+            events={cellEvents}
             selected={isSameDay(day, selectedDate)}
             onSelect={onSelectedDateChange}
           />
         ))}
       </div>
 
-      {calendarConnected && isLoading && (
+      {calendarConnected && loadingBusy && (
         <div className="border-t px-4 py-2 text-xs text-muted-foreground sm:px-6">
           予定を読み込み中…
         </div>
       )}
-      {calendarConnected && error && (
+      {calendarConnected && busyError && (
         <div className="border-t bg-rose-50 px-4 py-2 text-xs text-rose-900 sm:px-6 dark:bg-rose-950/30 dark:text-rose-200">
-          予定の取得に失敗しました ({error.message})
+          予定の取得に失敗しました ({busyError.message})
         </div>
       )}
     </section>

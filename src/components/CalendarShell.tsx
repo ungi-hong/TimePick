@@ -14,7 +14,7 @@ export function CalendarShell({ calendarConnected }: Props) {
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      <aside className="hidden w-72 shrink-0 border-r md:flex md:flex-col">
+      <aside className="hidden w-72 shrink-0 flex-col border-r md:flex">
         <MiniCalendar
           selectedDate={selectedDate}
           onSelectedDateChange={setSelectedDate}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { hasCalendarConnection } from "@/lib/calendar-connection";
 import { CalendarShell } from "@/components/CalendarShell";
+import { ProposalGenerateDialog } from "@/components/ProposalGenerateDialog";
 
 export default async function Home() {
   const session = await auth();
@@ -19,7 +20,10 @@ export default async function Home() {
           <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
             TimePick
           </h1>
-          <Badge variant={connected ? "default" : "secondary"} className="hidden sm:inline-flex">
+          <Badge
+            variant={connected ? "default" : "secondary"}
+            className="hidden sm:inline-flex"
+          >
             {connected ? "Calendar 連携済み" : "Calendar 未連携"}
           </Badge>
         </div>
@@ -27,6 +31,9 @@ export default async function Home() {
           <span className="hidden text-sm text-muted-foreground sm:inline">
             {session.user.email}
           </span>
+          <div className="w-[10.5rem] sm:w-auto">
+            <ProposalGenerateDialog disabled={!connected} />
+          </div>
           <Link
             href="/settings"
             className="text-sm text-muted-foreground hover:text-foreground"
