@@ -10,6 +10,14 @@ export type BusyEvent = {
   googleEventId: string;
 };
 
+export type MeetingEventInput = {
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  start: Date;
+  end: Date;
+};
+
 const buildOAuth2Client = async (userId: string) => {
   const account = await getGoogleAccount(userId);
   if (!account?.access_token) return null;
@@ -24,7 +32,6 @@ const buildOAuth2Client = async (userId: string) => {
     expiry_date: account.expires_at ? account.expires_at * 1000 : undefined,
   });
 
-  // 期限切れ時の自動リフレッシュを DB に反映
   client.on("tokens", (tokens) => {
     const data: Record<string, unknown> = {};
     if (tokens.access_token) data.access_token = tokens.access_token;
@@ -34,7 +41,7 @@ const buildOAuth2Client = async (userId: string) => {
     prisma.account
       .update({ where: { id: account.id }, data })
       .catch(() => {
-        // ベストエフォート: 反映失敗してもクライアント側のメモリにはあるので継続
+        // ベストエフォート
       });
   });
 
@@ -85,3 +92,124 @@ export const listBusyEvents = async (
     .map(toBusyEvent)
     .filter((e): e is BusyEvent => e !== null);
 };
+
+const toEventBody = (input: MeetingEventInput): calendar_v3.Schema$Event => ({
+  summary: input.title,
+  description: input.description ?? undefined,
+  location: input.location ?? undefined,
+  start: { dateTime: input.start.toISOString(), timeZone: "Asia/Tokyo" },
+  end: { dateTime: input.end.toISOString(), timeZone: "Asia/Tokyo" },
+});
+
+export const insertMeetingEvent = async (
+  userId: string,
+  input: MeetingEventInput,
+): Promise<string | null> => {
+  const calendar = await getCalendarClient(userId);
+  if (!calendar) return null;
+
+  const { data } = await calendar.events.insert({
+    calendarId: "primary",
+    requestBody: toEventBody(input),
+  });
+  return data.id ?? null;
+};
+
+export const patchMeetingEvent = async (
+  userId: string,
+  eventId: string,
+  input: Partial<MeetingEventInput>,
+): Promise<boolean> => {
+  const calendar = await getCalendarClient(userId);
+  if (!calendar) return false;
+
+  const body: calendar_v3.Schema$Event = {};
+  if (input.title !== undefined) body.summary = input.title;
+  if (input.description !== undefined) body.description = input.description ?? undefined;
+  if (input.location !== undefined) body.location = input.location ?? undefined;
+  if (input.start)
+    body.start = { dateTime: input.start.toISOString(), timeZone: "Asia/Tokyo" };
+  if (input.end)
+    body.end = { dateTime: input.end.toISOString(), timeZone: "Asia/Tokyo" };
+
+  await calendar.events.patch({
+    calendarId: "primary",
+    eventId,
+    requestBody: body,
+  });
+  return true;
+};
+
+export const deleteMeetingEvent = async (
+  userId: string,
+  eventId: string,
+): Promise<boolean> => {
+  const calendar = await getCalendarClient(userId);
+  if (!calendar) return false;
+
+  try {
+    await calendar.events.delete({ calendarId: "primary", eventId });
+    return true;
+  } catch (err) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      [404, 410].includes((err as { code: number }).code)
+    ) {
+      return true;
+    }
+    throw err;
+  }
+};
+
+const PROPOSAL_COLOR_ID = "5"; // banana (yellow)
+const PROPOSAL_DESCRIPTION =
+  "TimePick が生成した面談候補。確定または削除すると自動的に消えます。";
+
+export type ProposalEventInput = {
+  label: string;
+  start: Date;
+  end: Date;
+};
+
+const toProposalEventBody = (input: ProposalEventInput): calendar_v3.Schema$Event => ({
+  summary: `[候補] ${input.label}`,
+  description: PROPOSAL_DESCRIPTION,
+  colorId: PROPOSAL_COLOR_ID,
+  transparency: "transparent",
+  start: { dateTime: input.start.toISOString(), timeZone: "Asia/Tokyo" },
+  end: { dateTime: input.end.toISOString(), timeZone: "Asia/Tokyo" },
+});
+
+export const insertProposalEvent = async (
+  userId: string,
+  input: ProposalEventInput,
+): Promise<string | null> => {
+  const calendar = await getCalendarClient(userId);
+  if (!calendar) return null;
+
+  const { data } = await calendar.events.insert({
+    calendarId: "primary",
+    requestBody: toProposalEventBody(input),
+  });
+  return data.id ?? null;
+};
+
+export const patchProposalEventLabel = async (
+  userId: string,
+  eventId: string,
+  label: string,
+): Promise<boolean> => {
+  const calendar = await getCalendarClient(userId);
+  if (!calendar) return false;
+
+  await calendar.events.patch({
+    calendarId: "primary",
+    eventId,
+    requestBody: { summary: `[候補] ${label}` },
+  });
+  return true;
+};
+
+export const deleteProposalEvent = deleteMeetingEvent; // 同じロジック

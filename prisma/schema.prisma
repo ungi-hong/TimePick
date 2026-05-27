@@ -127,10 +127,11 @@ model Proposal {
 
 model ProposalSlot {
   id         String   @id @default(cuid())
-  proposalId String
-  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
-  startAt    DateTime
-  endAt      DateTime
+  proposalId    String
+  proposal      Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  startAt       DateTime
+  endAt         DateTime
+  googleEventId String?
 
   @@index([proposalId])
   @@index([startAt, endAt])

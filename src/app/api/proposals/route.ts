@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { hasCalendarConnection } from "@/lib/calendar-connection";
+import { insertProposalEvent } from "@/lib/google-calendar";
 
 const SaveSchema = z.object({
-  label: z.string().min(1).max(100),
+  label: z.string().trim().min(1).max(100),
   slots: z
     .array(
       z.object({
@@ -21,6 +23,7 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
 
   const body = await req.json().catch(() => null);
   const parsed = SaveSchema.safeParse(body);
@@ -32,9 +35,12 @@ export async function POST(req: Request) {
   }
 
   const { label, slots } = parsed.data;
+  const connected = await hasCalendarConnection(userId);
+
+  // 1) DB に Proposal + ProposalSlot を作成
   const created = await prisma.proposal.create({
     data: {
-      userId: session.user.id,
+      userId,
       label,
       slots: {
         create: slots.map((s) => ({
@@ -45,6 +51,30 @@ export async function POST(req: Request) {
     },
     include: { slots: true },
   });
+
+  // 2) Calendar に各 slot をイベントとして登録 (連携時のみ)
+  if (connected) {
+    await Promise.all(
+      created.slots.map(async (slot) => {
+        try {
+          const eventId = await insertProposalEvent(userId, {
+            label,
+            start: slot.startAt,
+            end: slot.endAt,
+          });
+          if (eventId) {
+            await prisma.proposalSlot.update({
+              where: { id: slot.id },
+              data: { googleEventId: eventId },
+            });
+          }
+        } catch (err) {
+          console.error("[/api/proposals POST] insertProposalEvent failed", err);
+          // ベストエフォート: 1 件失敗しても他は続ける
+        }
+      }),
+    );
+  }
 
   return NextResponse.json({
     id: created.id,
@@ -100,7 +130,7 @@ export async function GET(req: Request) {
           }
         : {}),
     },
-    include: { slots: true },
+    include: { slots: { orderBy: { startAt: "asc" } } },
     orderBy: { createdAt: "desc" },
   });
 

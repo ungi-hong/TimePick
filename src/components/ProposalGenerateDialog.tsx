@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
@@ -72,6 +73,7 @@ type Props = {
 
 export function ProposalGenerateDialog({ disabled }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("input");
 
@@ -143,7 +145,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
       if (data.candidates.length === 0) {
         toast.info("指定期間に空き時間が見つかりませんでした");
       }
-      setCandidates(data.candidates.map((c) => ({ ...c, selected: true })));
+      setCandidates(data.candidates.map((c) => ({ ...c, selected: false })));
       setPhase("preview");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "生成に失敗しました");
@@ -190,6 +192,10 @@ export function ProposalGenerateDialog({ disabled }: Props) {
         selectedCandidates.map((c) => ({ start: c.start, end: c.end })),
       );
       setPhase("saved");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["proposals"] }),
+        queryClient.invalidateQueries({ queryKey: ["busy"] }),
+      ]);
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "保存に失敗しました");

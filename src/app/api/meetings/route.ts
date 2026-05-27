@@ -1,0 +1,179 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
+import {
+  deleteProposalEvent,
+  insertMeetingEvent,
+} from "@/lib/google-calendar";
+import { hasCalendarConnection } from "@/lib/calendar-connection";
+
+const UrlOrEmpty = z
+  .string()
+  .trim()
+  .refine(
+    (v) => v === "" || /^https?:\/\//i.test(v),
+    "URL は http(s):// で始めてください",
+  );
+
+const CreateSchema = z
+  .object({
+    proposalId: z.string().min(1),
+    title: z.string().trim().min(1).max(200),
+    companyName: z.string().trim().min(1).max(200),
+    meetingUrl: UrlOrEmpty.nullable().optional(),
+    description: z.string().max(2000).nullable().optional(),
+    start: z.iso.datetime({ offset: true }),
+    end: z.iso.datetime({ offset: true }),
+  })
+  .refine((v) => new Date(v.start) < new Date(v.end), {
+    message: "開始は終了より前にしてください",
+    path: ["end"],
+  });
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = CreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "invalid", details: z.treeifyError(parsed.error) },
+      { status: 400 },
+    );
+  }
+
+  if (!(await hasCalendarConnection(session.user.id))) {
+    return NextResponse.json({ error: "calendar_not_connected" }, { status: 412 });
+  }
+
+  const data = parsed.data;
+  const userId = session.user.id;
+  const startAt = new Date(data.start);
+  const endAt = new Date(data.end);
+
+  // proposal の所有確認
+  const proposal = await prisma.proposal.findFirst({
+    where: { id: data.proposalId, userId },
+    include: { slots: true },
+  });
+  if (!proposal) {
+    return NextResponse.json({ error: "proposal_not_found" }, { status: 404 });
+  }
+  if (proposal.status === "CONFIRMED") {
+    return NextResponse.json({ error: "already_confirmed" }, { status: 409 });
+  }
+
+  // Google Calendar に書き込み
+  let googleEventId: string | null = null;
+  try {
+    googleEventId = await insertMeetingEvent(userId, {
+      title: data.title,
+      description: data.description ?? null,
+      location: data.meetingUrl ? data.meetingUrl : null,
+      start: startAt,
+      end: endAt,
+    });
+  } catch (err) {
+    console.error("[/api/meetings] insertMeetingEvent failed", err);
+    return NextResponse.json({ error: "google_insert_failed" }, { status: 502 });
+  }
+
+  // DB: Meeting 作成 + Proposal を CONFIRMED に
+  const meeting = await prisma.$transaction(async (tx) => {
+    const created = await tx.meeting.create({
+      data: {
+        userId,
+        proposalId: data.proposalId,
+        title: data.title,
+        companyName: data.companyName,
+        meetingUrl: data.meetingUrl ? data.meetingUrl : null,
+        description: data.description ?? null,
+        startAt,
+        endAt,
+        googleEventId,
+      },
+    });
+    await tx.proposal.update({
+      where: { id: data.proposalId },
+      data: { status: "CONFIRMED" },
+    });
+    return created;
+  });
+
+  // 候補として登録した Google Calendar イベントを削除 (確定したのでもう不要)
+  await Promise.all(
+    proposal.slots
+      .filter((s) => s.googleEventId)
+      .map(async (s) => {
+        try {
+          await deleteProposalEvent(userId, s.googleEventId!);
+        } catch (err) {
+          console.error("[/api/meetings POST] deleteProposalEvent failed", err);
+        }
+      }),
+  );
+
+  return NextResponse.json({
+    id: meeting.id,
+    proposalId: meeting.proposalId,
+    title: meeting.title,
+    companyName: meeting.companyName,
+    meetingUrl: meeting.meetingUrl,
+    description: meeting.description,
+    start: meeting.startAt.toISOString(),
+    end: meeting.endAt.toISOString(),
+    googleEventId: meeting.googleEventId,
+  });
+}
+
+const ListQuerySchema = z.object({
+  from: z.iso.datetime({ offset: true }).optional(),
+  to: z.iso.datetime({ offset: true }).optional(),
+});
+
+export async function GET(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const parsed = ListQuerySchema.safeParse({
+    from: url.searchParams.get("from") ?? undefined,
+    to: url.searchParams.get("to") ?? undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "invalid_query", details: z.treeifyError(parsed.error) },
+      { status: 400 },
+    );
+  }
+
+  const { from, to } = parsed.data;
+  const meetings = await prisma.meeting.findMany({
+    where: {
+      userId: session.user.id,
+      ...(to ? { startAt: { lt: new Date(to) } } : {}),
+      ...(from ? { endAt: { gt: new Date(from) } } : {}),
+    },
+    orderBy: { startAt: "asc" },
+  });
+
+  return NextResponse.json({
+    meetings: meetings.map((m) => ({
+      id: m.id,
+      proposalId: m.proposalId,
+      title: m.title,
+      companyName: m.companyName,
+      meetingUrl: m.meetingUrl,
+      description: m.description,
+      start: m.startAt.toISOString(),
+      end: m.endAt.toISOString(),
+      googleEventId: m.googleEventId,
+    })),
+  });
+}
