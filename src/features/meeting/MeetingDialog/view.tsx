@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatJst } from "@/lib/datetime";
-import { renderLinkified } from "@/lib/linkify";
+import { isSafeHttpUrl, renderLinkified } from "@/lib/linkify";
 import type { Meeting } from "./service";
 
 export type MeetingDialogViewProps = {
@@ -102,7 +102,7 @@ export function MeetingDialogView({
               {formatJst(meeting.start, "HH:mm")} 〜{" "}
               {formatJst(meeting.end, "HH:mm")}
             </p>
-            {meeting.meetingUrl && (
+            {isSafeHttpUrl(meeting.meetingUrl) && (
               <p>
                 <a
                   href={meeting.meetingUrl}

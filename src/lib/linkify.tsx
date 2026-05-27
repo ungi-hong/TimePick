@@ -1,5 +1,10 @@
 import { Fragment, type ReactNode } from "react";
 
+// javascript: / data: 等の危険スキームを弾く防衛的ガード。
+// href にバインドする前に必ず通すこと。
+export const isSafeHttpUrl = (url: string | null | undefined): url is string =>
+  typeof url === "string" && /^https?:\/\//i.test(url);
+
 // Google Calendar の description は HTML が混ざることがあるので、
 // <a href> の URL を可視テキスト側にも展開してから HTML を剥がす。
 export const htmlToPlainText = (raw: string): string =>

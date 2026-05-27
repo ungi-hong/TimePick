@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { ResponsiveModalContent } from "@/components/ui/responsive-modal";
 import { formatJst } from "@/lib/datetime";
-import { renderRichDescription } from "@/lib/linkify";
+import { isSafeHttpUrl, renderRichDescription } from "@/lib/linkify";
 
 export type EventInfo =
   | {
@@ -83,7 +83,7 @@ export function EventInfoDialog({ info, onClose }: Props) {
             <p className="text-muted-foreground">{timeText}</p>
           </div>
 
-          {info.type === "busy" && info.meetUrl && (
+          {info.type === "busy" && isSafeHttpUrl(info.meetUrl) && (
             <a
               href={info.meetUrl}
               target="_blank"
