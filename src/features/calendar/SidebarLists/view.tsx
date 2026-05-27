@@ -11,6 +11,7 @@ import {
 import { formatJst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Meeting } from "@/lib/use-meetings";
 import type { ManagedProposal } from "@/features/proposal/ProposalManageDialog";
 import type { ConfirmTarget } from "@/features/proposal/ConfirmMeetingDialog";
@@ -19,6 +20,8 @@ import type { ProposalListItem } from "./service";
 export type SidebarListsViewProps = {
   proposals: ProposalListItem[];
   meetings: Meeting[];
+  proposalsLoading: boolean;
+  meetingsLoading: boolean;
   expanded: Set<string>;
   onToggle: (id: string) => void;
   onProposalOpen: (p: ManagedProposal) => void;
@@ -26,9 +29,25 @@ export type SidebarListsViewProps = {
   onSlotConfirm: (target: ConfirmTarget) => void;
 };
 
+const SectionSkeleton = () => (
+  <ul className="space-y-1">
+    <li>
+      <Skeleton className="h-8 w-full" />
+    </li>
+    <li>
+      <Skeleton className="h-8 w-full" />
+    </li>
+    <li>
+      <Skeleton className="h-8 w-4/5" />
+    </li>
+  </ul>
+);
+
 export function SidebarListsView({
   proposals,
   meetings,
+  proposalsLoading,
+  meetingsLoading,
   expanded,
   onToggle,
   onProposalOpen,
@@ -42,7 +61,9 @@ export function SidebarListsView({
           <FileText className="h-3.5 w-3.5" />
           候補 ({proposals.length})
         </h4>
-        {proposals.length === 0 ? (
+        {proposalsLoading ? (
+          <SectionSkeleton />
+        ) : proposals.length === 0 ? (
           <p className="text-xs text-muted-foreground">候補はまだありません。</p>
         ) : (
           <ul className="space-y-1">
@@ -143,7 +164,9 @@ export function SidebarListsView({
           <CalendarCheck className="h-3.5 w-3.5" />
           確定済み ({meetings.length})
         </h4>
-        {meetings.length === 0 ? (
+        {meetingsLoading ? (
+          <SectionSkeleton />
+        ) : meetings.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             予定された面談はありません。
           </p>

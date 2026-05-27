@@ -18,6 +18,8 @@ export function SidebarLists(props: Props) {
     <SidebarListsView
       proposals={state.proposals}
       meetings={state.meetings}
+      proposalsLoading={state.proposalsLoading}
+      meetingsLoading={state.meetingsLoading}
       expanded={state.expanded}
       onToggle={state.toggle}
       onProposalOpen={props.onProposalOpen}
