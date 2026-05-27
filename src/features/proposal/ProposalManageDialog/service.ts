@@ -44,16 +44,22 @@ export const buildCopyText = (
     })
     .join("\n");
 
+export type PatchLabelResult = { googleSyncFailed: boolean };
+
 export const patchProposalLabel = async (
   id: string,
   label: string,
-): Promise<void> => {
+): Promise<PatchLabelResult> => {
   const res = await fetch(`/api/proposals/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ label }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const body = (await res.json().catch(() => ({}))) as {
+    googleSyncFailed?: boolean;
+  };
+  return { googleSyncFailed: body.googleSyncFailed ?? false };
 };
 
 export const deleteProposal = async (id: string): Promise<void> => {

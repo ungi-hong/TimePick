@@ -67,22 +67,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "already_confirmed" }, { status: 409 });
   }
 
-  // Google Calendar に書き込み
-  let googleEventId: string | null = null;
-  try {
-    googleEventId = await insertMeetingEvent(userId, {
-      title: data.title,
-      description: data.description ?? null,
-      location: data.meetingUrl ? data.meetingUrl : null,
-      start: startAt,
-      end: endAt,
-    });
-  } catch (err) {
-    console.error("[/api/meetings] insertMeetingEvent failed", err);
-    return NextResponse.json({ error: "google_insert_failed" }, { status: 502 });
-  }
-
-  // DB: Meeting 作成 + Proposal を CONFIRMED に
+  // 1) 先に DB を確定 (googleEventId は後付け)
   const meeting = await prisma.$transaction(async (tx) => {
     const created = await tx.meeting.create({
       data: {
@@ -94,7 +79,7 @@ export async function POST(req: Request) {
         description: data.description ?? null,
         startAt,
         endAt,
-        googleEventId,
+        googleEventId: null,
       },
     });
     await tx.proposal.update({
@@ -103,6 +88,36 @@ export async function POST(req: Request) {
     });
     return created;
   });
+
+  // 2) Google Calendar に書き込み。失敗したら DB をロールバックして
+  //    Google にだけ予定が残る孤児状態を回避。
+  let googleEventId: string | null = null;
+  try {
+    googleEventId = await insertMeetingEvent(userId, {
+      title: data.title,
+      description: data.description ?? null,
+      location: data.meetingUrl ? data.meetingUrl : null,
+      start: startAt,
+      end: endAt,
+    });
+    if (googleEventId) {
+      await prisma.meeting.update({
+        where: { id: meeting.id },
+        data: { googleEventId },
+      });
+    }
+  } catch (err) {
+    console.error("[/api/meetings] insertMeetingEvent failed", err);
+    // DB ロールバック: Meeting を削除し proposal を OPEN に戻す
+    await prisma.$transaction(async (tx) => {
+      await tx.meeting.delete({ where: { id: meeting.id } });
+      await tx.proposal.update({
+        where: { id: data.proposalId },
+        data: { status: "OPEN" },
+      });
+    });
+    return NextResponse.json({ error: "google_insert_failed" }, { status: 502 });
+  }
 
   // 候補として登録した Google Calendar イベントを削除 (確定したのでもう不要)
   await Promise.all(
@@ -126,7 +141,7 @@ export async function POST(req: Request) {
     description: meeting.description,
     start: meeting.startAt.toISOString(),
     end: meeting.endAt.toISOString(),
-    googleEventId: meeting.googleEventId,
+    googleEventId,
   });
 }
 

@@ -53,6 +53,8 @@ export async function POST(req: Request) {
   });
 
   // 2) Calendar に各 slot をイベントとして登録 (連携時のみ)
+  // 失敗した slot 数をレスポンスに含めてフロントで通知できるようにする。
+  const failedSlotIds: string[] = [];
   if (connected) {
     await Promise.all(
       created.slots.map(async (slot) => {
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
           }
         } catch (err) {
           console.error("[/api/proposals POST] insertProposalEvent failed", err);
-          // ベストエフォート: 1 件失敗しても他は続ける
+          failedSlotIds.push(slot.id);
         }
       }),
     );
@@ -85,6 +87,7 @@ export async function POST(req: Request) {
       start: s.startAt.toISOString(),
       end: s.endAt.toISOString(),
     })),
+    googleSyncFailedSlotIds: failedSlotIds,
   });
 }
 

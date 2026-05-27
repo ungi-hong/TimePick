@@ -73,6 +73,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
     endAt: data.end ? new Date(data.end) : existing.endAt,
   };
 
+  // 1) DB を先に更新
+  const updated = await prisma.meeting.update({
+    where: { id },
+    data: next,
+  });
+
+  // 2) Google を同期。失敗したら DB を旧値にロールバック。
   if (existing.googleEventId) {
     try {
       await patchMeetingEvent(session.user.id, existing.googleEventId, {
@@ -84,14 +91,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
       });
     } catch (err) {
       console.error("[/api/meetings/:id PATCH] google sync failed", err);
+      await prisma.meeting.update({
+        where: { id },
+        data: {
+          title: existing.title,
+          companyName: existing.companyName,
+          meetingUrl: existing.meetingUrl,
+          description: existing.description,
+          startAt: existing.startAt,
+          endAt: existing.endAt,
+        },
+      });
       return NextResponse.json({ error: "google_patch_failed" }, { status: 502 });
     }
   }
-
-  const updated = await prisma.meeting.update({
-    where: { id },
-    data: next,
-  });
 
   return NextResponse.json({
     id: updated.id,
@@ -124,9 +137,21 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     try {
       await deleteMeetingEvent(session.user.id, existing.googleEventId);
     } catch (err) {
+      // 403 はカレンダーへのアクセス権を失っているケースなので DB だけ消して終わる。
+      // それ以外 (5xx / ネットワーク断 / 401 等) は Google 側に幽霊イベントを残さない
+      // よう 502 を返してユーザーに再試行を促す。404/410 は deleteMeetingEvent 内で
+      // 既に成功扱い。
+      const code =
+        typeof err === "object" && err !== null && "code" in err
+          ? Number((err as { code: number }).code)
+          : null;
       console.error("[/api/meetings/:id DELETE] google delete failed", err);
-      // ベストエフォート: Google 側削除に失敗しても DB からは消す方針
-      // (Google 側に残った場合は手動で消してもらう)
+      if (code !== 403) {
+        return NextResponse.json(
+          { error: "google_delete_failed", code },
+          { status: 502 },
+        );
+      }
     }
   }
 

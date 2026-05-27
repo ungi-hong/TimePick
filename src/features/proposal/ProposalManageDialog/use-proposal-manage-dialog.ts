@@ -66,8 +66,14 @@ export const useProposalManageDialog = (
     }
     setBusy(true);
     try {
-      await patchProposalLabel(proposal.id, next);
-      toast.success("ラベルを更新しました");
+      const { googleSyncFailed } = await patchProposalLabel(proposal.id, next);
+      if (googleSyncFailed) {
+        toast.warning(
+          "ラベルは保存しましたが Google Calendar 側の更新に失敗しました",
+        );
+      } else {
+        toast.success("ラベルを更新しました");
+      }
       setEditing(false);
       await queryClient.invalidateQueries({ queryKey: ["proposals"] });
       await queryClient.invalidateQueries({ queryKey: ["busy"] });

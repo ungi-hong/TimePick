@@ -105,7 +105,7 @@ export const useProposalGenerateDialog = () => {
     }
     setSaving(true);
     try {
-      await saveProposal({
+      const { googleSyncFailedSlotIds } = await saveProposal({
         label: label.trim(),
         slots: selectedCandidates.map((c) => ({ start: c.start, end: c.end })),
       });
@@ -114,6 +114,11 @@ export const useProposalGenerateDialog = () => {
         selectedCandidates.map((c) => ({ start: c.start, end: c.end })),
       );
       setPhase("saved");
+      if (googleSyncFailedSlotIds.length > 0) {
+        toast.warning(
+          `${googleSyncFailedSlotIds.length} 件は Google Calendar への書き込みに失敗しました`,
+        );
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["proposals"] }),
         queryClient.invalidateQueries({ queryKey: ["busy"] }),

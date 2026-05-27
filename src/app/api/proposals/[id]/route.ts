@@ -38,6 +38,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
+  let googleSyncFailed = false;
   if (parsed.data.label && parsed.data.label !== existing.label) {
     const newLabel = parsed.data.label;
     await prisma.proposal.update({
@@ -46,23 +47,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
     });
 
     // Google Calendar 側のイベントタイトルも更新
-    await Promise.all(
+    const results = await Promise.all(
       existing.slots
         .filter((s) => s.googleEventId)
         .map(async (s) => {
           try {
             await patchProposalEventLabel(userId, s.googleEventId!, newLabel);
+            return true;
           } catch (err) {
             console.error(
               "[/api/proposals/:id PATCH] patchProposalEventLabel failed",
               err,
             );
+            return false;
           }
         }),
     );
+    googleSyncFailed = results.some((ok) => !ok);
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, googleSyncFailed });
 }
 
 export async function DELETE(_req: Request, ctx: Ctx) {

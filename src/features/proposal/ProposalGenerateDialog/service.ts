@@ -80,14 +80,24 @@ export const requestGenerate = async (
   return data.candidates;
 };
 
+export type SaveProposalResult = {
+  googleSyncFailedSlotIds: string[];
+};
+
 export const saveProposal = async (input: {
   label: string;
   slots: Candidate[];
-}): Promise<void> => {
+}): Promise<SaveProposalResult> => {
   const res = await fetch("/api/proposals", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const body = (await res.json().catch(() => ({}))) as {
+    googleSyncFailedSlotIds?: string[];
+  };
+  return {
+    googleSyncFailedSlotIds: body.googleSyncFailedSlotIds ?? [],
+  };
 };
