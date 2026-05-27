@@ -10,5 +10,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    // 本番 (Vercel/Linux) は UTC 環境。JST との跨ぎ日付バグを CI で再現させる。
+    env: { TZ: "UTC" },
   },
 });

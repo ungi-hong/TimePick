@@ -182,6 +182,41 @@ describe("generateProposalCandidates", () => {
     expect(result[0].end.getTime()).toBe(jst("2026-06-01T18:00:00").getTime());
   });
 
+  // 回帰: JST 月曜 (UTC では前日 15:00 = UTC 日曜) を月曜扱いし続けることを担保。
+  // process.env.TZ=UTC で vitest を回すと、修正前は getDay(monday) が 0 を返し
+  // skipHolidays=true で月曜が落ちていた。
+  it("[regression] UTC 環境でも JST 月曜の候補が落ちない", () => {
+    const result = generateProposalCandidates({
+      weeklyHours: HOURS_10_18,
+      skipHolidays: true,
+      exceptions: [],
+      conflicts: [],
+      from: jst("2026-06-01T00:00:00"), // JST 月曜
+      to: jst("2026-06-01T23:59:59"),
+      now: jst("2026-05-31T00:00:00"),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].start.getTime()).toBe(jst("2026-06-01T10:00:00").getTime());
+  });
+
+  // 回帰: JST 祝日 (5/3 憲法記念日) を UTC では前日 5/2 として誤判定していた問題。
+  it("[regression] UTC 環境でも JST 祝日 (5/3) が正しく除外される", () => {
+    const result = generateProposalCandidates({
+      weeklyHours: {
+        ...HOURS_10_18,
+        sun: { start: "10:00", end: "18:00" }, // 日曜稼働にしないと祝日判定が見えない
+      },
+      skipHolidays: true,
+      exceptions: [],
+      conflicts: [],
+      from: jst("2026-05-03T00:00:00"), // 憲法記念日 (日曜)
+      to: jst("2026-05-03T23:59:59"),
+      now: jst("2026-05-01T00:00:00"),
+    });
+    // 日曜だが祝日でもあるので除外される
+    expect(result).toHaveLength(0);
+  });
+
   it("結果は時刻順にソート", () => {
     const result = generateProposalCandidates({
       weeklyHours: HOURS_10_18,

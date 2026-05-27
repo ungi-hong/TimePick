@@ -1,15 +1,18 @@
 import holidayJp from "@holiday-jp/holiday_jp";
-import { JST } from "@/lib/datetime";
-import { formatInTimeZone } from "date-fns-tz";
+import { jstDateKey } from "@/lib/datetime";
 
-export const isHoliday = (date: Date): boolean => holidayJp.isHoliday(date);
-
-export const getHolidayName = (date: Date): string | null => {
-  // JST 上での 1 日範囲で問い合わせる
-  const dayKey = formatInTimeZone(date, JST, "yyyy-MM-dd");
-  const hit = holidayJp.between(
-    new Date(`${dayKey}T00:00:00+09:00`),
-    new Date(`${dayKey}T23:59:59+09:00`),
+// holidayJp は Date を受け取ると getFullYear/getMonth/getDate を使う = ランタイム TZ 依存。
+// JST 日付に正規化してから判定する。
+const lookupByJstKey = (date: Date): { name: string } | null => {
+  const key = jstDateKey(date);
+  const hits = holidayJp.between(
+    new Date(`${key}T00:00:00+09:00`),
+    new Date(`${key}T23:59:59+09:00`),
   );
-  return hit[0]?.name ?? null;
+  return hits[0] ?? null;
 };
+
+export const isHoliday = (date: Date): boolean => lookupByJstKey(date) !== null;
+
+export const getHolidayName = (date: Date): string | null =>
+  lookupByJstKey(date)?.name ?? null;

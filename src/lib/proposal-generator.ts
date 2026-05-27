@@ -1,8 +1,8 @@
-import { addDays, getDay } from "date-fns";
+import { addDays } from "date-fns";
 import type { AvailabilityExceptionDto, WeeklyHours, DayKey } from "@/lib/availability";
 import { DAY_KEYS } from "@/lib/availability";
 import { isHoliday } from "@/lib/holiday";
-import { startOfJstDay, JST } from "@/lib/datetime";
+import { startOfJstDay, JST, jstDateKey } from "@/lib/datetime";
 import { formatInTimeZone } from "date-fns-tz";
 
 export type TimeRange = { start: Date; end: Date };
@@ -22,10 +22,8 @@ export type GenerateInput = {
 };
 
 // "HH:mm" + JST 日付 → Date
-const combineDateTime = (jstDay: Date, hm: string): Date => {
-  const dateKey = formatInTimeZone(jstDay, JST, "yyyy-MM-dd");
-  return new Date(`${dateKey}T${hm}:00+09:00`);
-};
+const combineDateTime = (jstDay: Date, hm: string): Date =>
+  new Date(`${jstDateKey(jstDay)}T${hm}:00+09:00`);
 
 const dayKeyOf = (date: Date): DayKey => {
   const jstDow = Number(formatInTimeZone(date, JST, "i")); // 1=Mon..7=Sun
@@ -33,7 +31,10 @@ const dayKeyOf = (date: Date): DayKey => {
   return DAY_KEYS[idx];
 };
 
-const jstDateKey = (date: Date): string => formatInTimeZone(date, JST, "yyyy-MM-dd");
+const isJstWeekend = (date: Date): boolean => {
+  const key = dayKeyOf(date);
+  return key === "sat" || key === "sun";
+};
 
 const getDayWindow = (
   date: Date,
@@ -49,8 +50,7 @@ const getDayWindow = (
   }
 
   if (skipHolidays) {
-    const dow = getDay(date);
-    if (dow === 0 || dow === 6) return null;
+    if (isJstWeekend(date)) return null;
     if (isHoliday(date)) return null;
   }
 
