@@ -25,8 +25,8 @@ import {
   type AvailabilitySettings,
   type WeeklyHours,
 } from "@/lib/availability";
-import { AvailabilityForm } from "@/components/AvailabilityForm";
-import { ExceptionsList } from "@/components/ExceptionsList";
+import { AvailabilityForm } from "@/features/availability/AvailabilityForm";
+import { ExceptionsList } from "@/features/availability/ExceptionsList";
 
 async function connectCalendarAction() {
   "use server";

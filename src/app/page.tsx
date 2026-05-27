@@ -4,9 +4,9 @@ import { auth, signOut } from "@/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { hasCalendarConnection } from "@/lib/calendar-connection";
-import { CalendarShell } from "@/components/CalendarShell";
-import { ProposalGenerateDialog } from "@/components/ProposalGenerateDialog";
-import { StaleProposalsBanner } from "@/components/StaleProposalsBanner";
+import { CalendarShell } from "@/features/calendar/CalendarShell";
+import { ProposalGenerateDialog } from "@/features/proposal/ProposalGenerateDialog";
+import { StaleProposalsBanner } from "@/features/proposal/StaleProposalsBanner";
 
 export default async function Home() {
   const session = await auth();

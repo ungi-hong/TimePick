@@ -9,8 +9,8 @@ import { formatJst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Meeting } from "@/lib/use-meetings";
-import type { ManagedProposal } from "@/components/ProposalManageDialog";
-import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
+import type { ManagedProposal } from "@/features/proposal/ProposalManageDialog";
+import type { ConfirmTarget } from "@/features/proposal/ConfirmMeetingDialog";
 
 type ProposalListItem = {
   id: string;

@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
-import { MonthView } from "@/components/MonthView";
-import { WeekView } from "@/components/WeekView";
-import { DayView } from "@/components/DayView";
-import { ScheduleView } from "@/components/ScheduleView";
-import type { ViewMode } from "@/components/CalendarHeader";
-import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
-import type { EventInfo } from "@/components/EventInfoDialog";
+import { MonthView } from "@/features/calendar/views/MonthView";
+import { WeekView } from "@/features/calendar/views/WeekView";
+import { DayView } from "@/features/calendar/views/DayView";
+import { ScheduleView } from "@/features/calendar/views/ScheduleView";
+import type { ViewMode } from "@/features/calendar/CalendarHeader";
+import type { ConfirmTarget } from "@/features/proposal/ConfirmMeetingDialog";
+import type { EventInfo } from "@/features/calendar/EventInfoDialog";
 import type { Meeting } from "@/lib/use-meetings";
 
 type Props = {

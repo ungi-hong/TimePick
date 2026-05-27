@@ -12,22 +12,22 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { MiniCalendar } from "@/components/MiniCalendar";
-import { CalendarView } from "@/components/CalendarView";
-import { SidebarLists } from "@/components/SidebarLists";
+import { MiniCalendar } from "@/features/calendar/MiniCalendar";
+import { CalendarView } from "@/features/calendar/CalendarView";
+import { SidebarLists } from "@/features/calendar/SidebarLists";
 import {
   ConfirmMeetingDialog,
   type ConfirmTarget,
-} from "@/components/ConfirmMeetingDialog";
-import { MeetingDialog } from "@/components/MeetingDialog";
+} from "@/features/proposal/ConfirmMeetingDialog";
+import { MeetingDialog } from "@/features/meeting/MeetingDialog";
 import {
   ProposalManageDialog,
   type ManagedProposal,
-} from "@/components/ProposalManageDialog";
+} from "@/features/proposal/ProposalManageDialog";
 import {
   EventInfoDialog,
   type EventInfo,
-} from "@/components/EventInfoDialog";
+} from "@/features/calendar/EventInfoDialog";
 import type { Meeting } from "@/lib/use-meetings";
 
 type Props = {

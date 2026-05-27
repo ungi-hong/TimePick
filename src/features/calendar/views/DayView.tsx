@@ -15,9 +15,9 @@ import {
   overlapsDay,
   type CellEvent,
 } from "@/lib/calendar-events";
-import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
-import type { EventInfo } from "@/components/EventInfoDialog";
-import { CalendarHeader, type ViewMode } from "@/components/CalendarHeader";
+import type { ConfirmTarget } from "@/features/proposal/ConfirmMeetingDialog";
+import type { EventInfo } from "@/features/calendar/EventInfoDialog";
+import { CalendarHeader, type ViewMode } from "@/features/calendar/CalendarHeader";
 
 type Props = {
   calendarConnected: boolean;
