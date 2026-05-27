@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import {
   deleteMeetingEvent,
@@ -35,10 +35,9 @@ const PatchSchema = z
   );
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
   const { id } = await ctx.params;
 
   const body = await req.json().catch(() => null);
@@ -51,7 +50,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   const existing = await prisma.meeting.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
   });
   if (!existing) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -82,7 +81,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   // 2) Google を同期。失敗したら DB を旧値にロールバック。
   if (existing.googleEventId) {
     try {
-      await patchMeetingEvent(session.user.id, existing.googleEventId, {
+      await patchMeetingEvent(userId, existing.googleEventId, {
         title: next.title,
         description: next.description,
         location: next.meetingUrl,
@@ -120,14 +119,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
 }
 
 export async function DELETE(_req: Request, ctx: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
   const { id } = await ctx.params;
 
   const existing = await prisma.meeting.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
   });
   if (!existing) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -135,7 +133,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
 
   if (existing.googleEventId) {
     try {
-      await deleteMeetingEvent(session.user.id, existing.googleEventId);
+      await deleteMeetingEvent(userId, existing.googleEventId);
     } catch (err) {
       // 403 はカレンダーへのアクセス権を失っているケースなので DB だけ消して終わる。
       // それ以外 (5xx / ネットワーク断 / 401 等) は Google 側に幽霊イベントを残さない

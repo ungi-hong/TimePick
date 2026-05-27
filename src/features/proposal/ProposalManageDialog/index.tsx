@@ -12,10 +12,24 @@ type Props = {
 };
 
 export function ProposalManageDialog({ proposal, onClose }: Props) {
-  const state = useProposalManageDialog(proposal, onClose);
-
   if (!proposal) return null;
+  return (
+    <ProposalManageDialogInner
+      key={proposal.id}
+      proposal={proposal}
+      onClose={onClose}
+    />
+  );
+}
 
+function ProposalManageDialogInner({
+  proposal,
+  onClose,
+}: {
+  proposal: ManagedProposal;
+  onClose: () => void;
+}) {
+  const state = useProposalManageDialog(proposal, onClose);
   return (
     <ProposalManageDialogView
       proposal={proposal}
@@ -27,7 +41,7 @@ export function ProposalManageDialog({ proposal, onClose }: Props) {
       onShowYearChange={state.setShowYear}
       copyText={state.copyText}
       busy={state.busy}
-      onClose={state.close}
+      onClose={onClose}
       onSaveLabel={state.saveLabel}
       onCopy={state.copyToClipboard}
       onRemove={state.remove}

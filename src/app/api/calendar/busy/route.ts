@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/api-auth";
 import { hasCalendarConnection } from "@/lib/calendar-connection";
 import { listBusyEvents } from "@/lib/google-calendar";
 import { prisma } from "@/lib/db";
@@ -11,10 +11,9 @@ const QuerySchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const parsed = QuerySchema.safeParse({
     from: req.nextUrl.searchParams.get("from"),
@@ -26,8 +25,6 @@ export async function GET(req: NextRequest) {
       { status: 400 },
     );
   }
-
-  const userId = session.user.id;
 
   if (!(await hasCalendarConnection(userId))) {
     return NextResponse.json({ error: "calendar_not_connected" }, { status: 412 });

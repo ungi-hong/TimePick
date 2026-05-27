@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function DELETE(_req: Request, ctx: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const { id } = await ctx.params;
   const result = await prisma.availabilityException.deleteMany({
     where: {
       id,
-      availability: { userId: session.user.id },
+      availability: { userId },
     },
   });
 

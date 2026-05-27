@@ -23,6 +23,7 @@ import { formatJst } from "@/lib/datetime";
 import type { Meeting } from "@/lib/use-meetings";
 import {
   cellEventColorClass,
+  cellEventTitle,
   overlapsDay,
   type CellEvent,
 } from "@/lib/calendar-events";
@@ -112,15 +113,7 @@ function DayCell({
                 "truncate rounded px-1 text-[10px] leading-4",
                 cellEventColorClass(e.type),
               )}
-              title={
-                e.type === "busy"
-                  ? e.summary
-                  : e.type === "proposal"
-                    ? e.label
-                    : e.type === "meeting"
-                      ? e.title
-                      : e.name
-              }
+              title={cellEventTitle(e, "short")}
             >
               {renderChipLabel(e)}
             </span>
@@ -149,14 +142,7 @@ function DayCell({
                 (e.type === "busy" && e.allDay) || e.type === "holiday"
                   ? "終日"
                   : `${formatJst(e.start, "HH:mm")} 〜 ${formatJst(e.end, "HH:mm")}`;
-              const title =
-                e.type === "busy"
-                  ? e.summary
-                  : e.type === "proposal"
-                    ? `候補: ${e.label}`
-                    : e.type === "meeting"
-                      ? `${e.title} / ${e.companyName}`
-                      : `祝日: ${e.name}`;
+              const title = cellEventTitle(e, "detail");
               const onRowClick = () => {
                 if (e.type === "proposal") {
                   onProposalConfirm({

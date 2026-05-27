@@ -12,41 +12,24 @@ import {
   type ManagedProposal,
 } from "./service";
 
+// proposal は非 null 前提。親側で key={proposal.id} を渡して再 mount すること。
 export const useProposalManageDialog = (
-  proposal: ManagedProposal | null,
+  proposal: ManagedProposal,
   onClose: () => void,
 ) => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState(false);
-  const [labelDraft, setLabelDraft] = useState("");
+  const [labelDraft, setLabelDraft] = useState(proposal.label);
   const [showYear, setShowYear] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const propKey = proposal?.id ?? null;
-  const [appliedKey, setAppliedKey] = useState<string | null>(null);
-  if (proposal && propKey !== appliedKey) {
-    setEditing(false);
-    setLabelDraft(proposal.label);
-    setShowYear(false);
-    setAppliedKey(propKey);
-  }
-
-  const groups = useMemo(
-    () => (proposal ? groupByDate(proposal.slots) : []),
-    [proposal],
-  );
+  const groups = useMemo(() => groupByDate(proposal.slots), [proposal.slots]);
   const copyText = useMemo(
     () => buildCopyText(groups, showYear),
     [groups, showYear],
   );
-
-  const close = () => {
-    setEditing(false);
-    setAppliedKey(null);
-    onClose();
-  };
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(copyText);
@@ -54,7 +37,6 @@ export const useProposalManageDialog = (
   };
 
   const saveLabel = async () => {
-    if (!proposal) return;
     const next = labelDraft.trim();
     if (!next) {
       toast.error("ラベルを入力してください");
@@ -86,7 +68,6 @@ export const useProposalManageDialog = (
   };
 
   const remove = async () => {
-    if (!proposal) return;
     if (
       !confirm(
         "この候補を削除しますか? Google Calendar 上の候補イベントも削除されます。",
@@ -101,7 +82,7 @@ export const useProposalManageDialog = (
       await queryClient.invalidateQueries({ queryKey: ["proposals"] });
       await queryClient.invalidateQueries({ queryKey: ["busy"] });
       router.refresh();
-      close();
+      onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "削除に失敗しました");
     } finally {
@@ -118,7 +99,6 @@ export const useProposalManageDialog = (
     setShowYear,
     busy,
     copyText,
-    close,
     copyToClipboard,
     saveLabel,
     remove,

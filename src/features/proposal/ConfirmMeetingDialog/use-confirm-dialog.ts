@@ -18,53 +18,36 @@ import {
 
 export type UseConfirmDialog = ReturnType<typeof useConfirmDialog>;
 
+// target は非 null 前提。null/非 null 切替や target 差し替えは
+// 親側で key={target.slotId} を渡して再 mount させること。
 export const useConfirmDialog = (
-  target: ConfirmTarget | null,
+  target: ConfirmTarget,
   onClose: () => void,
 ) => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = useState("");
+  const slotStartHM = formatJst(target.slotStart, "HH:mm");
+  const slotEndHM = formatJst(target.slotEnd, "HH:mm");
+  const slotSpanMinutes = toMinutes(slotEndHM) - toMinutes(slotStartHM);
+
+  const initialDuration: Duration = slotSpanMinutes >= 60 ? 60 : 30;
+  const initialEndTime = fromMinutes(
+    Math.min(toMinutes(slotStartHM) + initialDuration, toMinutes(slotEndHM)),
+  );
+
+  const [title, setTitle] = useState(target.label);
   const [companyName, setCompanyName] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
   const [description, setDescription] = useState("");
-  const [duration, setDuration] = useState<Duration>(60);
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [duration, setDuration] = useState<Duration>(initialDuration);
+  const [startTime, setStartTime] = useState(slotStartHM);
+  const [endTime, setEndTime] = useState(initialEndTime);
   const [submitting, setSubmitting] = useState(false);
 
-  const slotStartHM = target ? formatJst(target.slotStart, "HH:mm") : "";
-  const slotEndHM = target ? formatJst(target.slotEnd, "HH:mm") : "";
-  const slotSpanMinutes = target
-    ? toMinutes(slotEndHM) - toMinutes(slotStartHM)
-    : 0;
-
-  // target が変わったときに初期値をセット
-  const targetKey = target ? target.slotId : null;
-  const [appliedKey, setAppliedKey] = useState<string | null>(null);
-  if (target && targetKey !== appliedKey) {
-    setTitle(target.label);
-    setCompanyName("");
-    setMeetingUrl("");
-    setDescription("");
-    const initialDuration: Duration = slotSpanMinutes >= 60 ? 60 : 30;
-    setDuration(initialDuration);
-    setStartTime(slotStartHM);
-    setEndTime(
-      fromMinutes(
-        Math.min(
-          toMinutes(slotStartHM) + initialDuration,
-          toMinutes(slotEndHM),
-        ),
-      ),
-    );
-    setAppliedKey(targetKey);
-  }
-
   const startOptions = useMemo(
-    () => (target ? generateStartOptions(slotStartHM, slotEndHM, duration) : []),
-    [target, slotStartHM, slotEndHM, duration],
+    () => generateStartOptions(slotStartHM, slotEndHM, duration),
+    [slotStartHM, slotEndHM, duration],
   );
 
   const applyDuration = (next: Duration) => {
@@ -88,28 +71,10 @@ export const useConfirmDialog = (
     setEndTime(fromMinutes(e));
   };
 
-  const reset = () => {
-    setTitle("");
-    setCompanyName("");
-    setMeetingUrl("");
-    setDescription("");
-    setDuration(60);
-    setStartTime("");
-    setEndTime("");
-    setSubmitting(false);
-    setAppliedKey(null);
-  };
-
-  const handleClose = () => {
-    reset();
-    onClose();
-  };
-
   const durationFitsSlot = (d: Duration) => slotSpanMinutes >= d;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!target) return;
 
     const err = validateConfirm({
       title,
@@ -144,7 +109,7 @@ export const useConfirmDialog = (
       await queryClient.invalidateQueries({ queryKey: ["proposals"] });
       await queryClient.invalidateQueries({ queryKey: ["meetings"] });
       router.refresh();
-      handleClose();
+      onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "確定に失敗しました");
     } finally {
@@ -173,7 +138,6 @@ export const useConfirmDialog = (
     applyDuration,
     pickStart,
     durationFitsSlot,
-    handleClose,
     onSubmit,
   };
 };

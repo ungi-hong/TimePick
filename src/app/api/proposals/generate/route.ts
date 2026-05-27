@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { formatInTimeZone } from "date-fns-tz";
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { JST } from "@/lib/datetime";
 import {
@@ -24,10 +24,9 @@ const InputSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const body = await req.json().catch(() => null);
   const parsed = InputSchema.safeParse(body);
@@ -38,7 +37,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!(await hasCalendarConnection(session.user.id))) {
+  if (!(await hasCalendarConnection(userId))) {
     return NextResponse.json({ error: "calendar_not_connected" }, { status: 412 });
   }
 
@@ -47,7 +46,7 @@ export async function POST(req: Request) {
   const to = new Date(toIso);
 
   const row = await prisma.availability.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: userId },
     include: { exceptions: true },
   });
 
@@ -64,10 +63,10 @@ export async function POST(req: Request) {
     })) ?? [];
 
   const [busy, openSlots, meetings] = await Promise.all([
-    listBusyEvents(session.user.id, from, to),
+    listBusyEvents(userId, from, to),
     prisma.proposalSlot.findMany({
       where: {
-        proposal: { userId: session.user.id, status: "OPEN" },
+        proposal: { userId: userId, status: "OPEN" },
         startAt: { lt: to },
         endAt: { gt: from },
       },
@@ -75,7 +74,7 @@ export async function POST(req: Request) {
     }),
     prisma.meeting.findMany({
       where: {
-        userId: session.user.id,
+        userId: userId,
         startAt: { lt: to },
         endAt: { gt: from },
       },

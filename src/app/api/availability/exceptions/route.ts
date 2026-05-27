@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import {
   AvailabilityExceptionInputSchema,
@@ -11,10 +11,9 @@ import { formatInTimeZone } from "date-fns-tz";
 import { JST } from "@/lib/datetime";
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const body = await req.json().catch(() => null);
   const parsed = AvailabilityExceptionInputSchema.safeParse(body);
@@ -25,7 +24,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const availability = await getOrCreateAvailability(session.user.id);
+  const availability = await getOrCreateAvailability(userId);
   const dateUtc = new Date(`${parsed.data.date}T00:00:00+09:00`);
 
   try {

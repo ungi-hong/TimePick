@@ -10,10 +10,20 @@ type Props = {
 };
 
 export function MeetingDialog({ meeting, onClose }: Props) {
-  const state = useMeetingDialog(meeting, onClose);
-
   if (!meeting) return null;
+  return (
+    <MeetingDialogInner key={meeting.id} meeting={meeting} onClose={onClose} />
+  );
+}
 
+function MeetingDialogInner({
+  meeting,
+  onClose,
+}: {
+  meeting: Meeting;
+  onClose: () => void;
+}) {
+  const state = useMeetingDialog(meeting, onClose);
   return (
     <MeetingDialogView
       meeting={meeting}
@@ -34,7 +44,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
       endTime={state.endTime}
       onEndTimeChange={state.setEndTime}
       busy={state.busy}
-      onClose={state.handleClose}
+      onClose={onClose}
       onSave={state.onSave}
       onDelete={state.onDelete}
     />

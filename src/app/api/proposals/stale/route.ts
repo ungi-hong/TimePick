@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
 const QuerySchema = z.object({
@@ -8,10 +8,9 @@ const QuerySchema = z.object({
 });
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const url = new URL(req.url);
   const parsed = QuerySchema.safeParse({
@@ -26,7 +25,7 @@ export async function GET(req: Request) {
 
   const proposals = await prisma.proposal.findMany({
     where: {
-      userId: session.user.id,
+      userId,
       status: "OPEN",
       updatedAt: { lt: threshold },
     },

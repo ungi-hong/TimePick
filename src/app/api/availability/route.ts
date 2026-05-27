@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import {
   AvailabilitySettingsSchema,
@@ -12,13 +12,12 @@ import { formatInTimeZone } from "date-fns-tz";
 import { JST } from "@/lib/datetime";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const row = await prisma.availability.findUnique({
-    where: { userId: session.user.id },
+    where: { userId },
     include: { exceptions: { orderBy: { date: "asc" } } },
   });
 
@@ -42,10 +41,9 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const body = await req.json().catch(() => null);
   const parsed = AvailabilitySettingsSchema.safeParse(body);
@@ -58,9 +56,9 @@ export async function PUT(req: Request) {
 
   const data = parsed.data;
   await prisma.availability.upsert({
-    where: { userId: session.user.id },
+    where: { userId },
     create: {
-      userId: session.user.id,
+      userId,
       weeklyHours: data.weeklyHours,
       skipHolidays: data.skipHolidays,
     },

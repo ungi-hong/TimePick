@@ -123,4 +123,21 @@ export const cellEventColorClass = (type: CellEvent["type"]): string => {
   }
 };
 
+// 表示用タイトル。短形式 (リスト中) と詳細形式 (popover) で文言が違うため variant を分ける。
+export const cellEventTitle = (
+  e: CellEvent,
+  variant: "short" | "detail" = "short",
+): string => {
+  switch (e.type) {
+    case "busy":
+      return e.summary;
+    case "proposal":
+      return `候補: ${e.label}`;
+    case "meeting":
+      return variant === "detail" ? `${e.title} / ${e.companyName}` : e.title;
+    case "holiday":
+      return variant === "detail" ? `祝日: ${e.name}` : e.name;
+  }
+};
+
 export { JST };

@@ -1,5 +1,7 @@
-import { ja } from "date-fns/locale";
-import { formatJst } from "@/lib/datetime";
+import {
+  buildProposalCopyText,
+  groupByJstDate,
+} from "@/lib/proposal-format";
 
 export type ManagedProposal = {
   id: string;
@@ -9,40 +11,8 @@ export type ManagedProposal = {
 
 export type SlotItem = ManagedProposal["slots"][number];
 
-export const groupByDate = (
-  slots: SlotItem[],
-): Array<[string, SlotItem[]]> => {
-  const map = new Map<string, SlotItem[]>();
-  for (const s of slots) {
-    const key = formatJst(s.start, "yyyy-MM-dd");
-    const list = map.get(key) ?? [];
-    list.push(s);
-    map.set(key, list);
-  }
-  return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-};
-
-export const buildCopyText = (
-  groups: Array<[string, SlotItem[]]>,
-  showYear: boolean,
-): string =>
-  groups
-    .map(([dateKey, items]) => {
-      const sample = new Date(`${dateKey}T00:00:00+09:00`);
-      const datePart = formatJst(
-        sample,
-        showYear ? "yyyy年 M月d日(E)" : "M月d日(E)",
-        { locale: ja },
-      );
-      const ranges = items
-        .map(
-          (c) =>
-            `${formatJst(c.start, "HH:mm")} 〜 ${formatJst(c.end, "HH:mm")}`,
-        )
-        .join(" または ");
-      return `${datePart} ${ranges}`;
-    })
-    .join("\n");
+export const groupByDate = groupByJstDate;
+export const buildCopyText = buildProposalCopyText;
 
 export type PatchLabelResult = { googleSyncFailed: boolean };
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { hasCalendarConnection } from "@/lib/calendar-connection";
 import { insertProposalEvent } from "@/lib/google-calendar";
@@ -19,11 +19,9 @@ const SaveSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const body = await req.json().catch(() => null);
   const parsed = SaveSchema.safeParse(body);
@@ -98,10 +96,9 @@ const ListQuerySchema = z.object({
 });
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUserId();
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
   const url = new URL(req.url);
   const parsed = ListQuerySchema.safeParse({
@@ -120,7 +117,7 @@ export async function GET(req: Request) {
 
   const proposals = await prisma.proposal.findMany({
     where: {
-      userId: session.user.id,
+      userId,
       ...(status ? { status } : {}),
       ...(from || to
         ? {
