@@ -1,13 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
-import {
-  AvailabilityExceptionInputSchema,
-  type AvailabilityExceptionDto,
-  type AvailabilityExceptionInput,
-} from "@/lib/availability";
+import type { AvailabilityExceptionDto } from "@/lib/availability";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,86 +13,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import type { FormState } from "./service";
 
-type FormState = {
-  date: string;
-  closed: boolean;
-  start: string;
-  end: string;
-  note: string;
+export type ExceptionsListViewProps = {
+  items: AvailabilityExceptionDto[];
+  form: FormState;
+  submitting: boolean;
+  onFormChange: (updater: (prev: FormState) => FormState) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onRemove: (id: string) => void;
 };
 
-const DEFAULT_FORM: FormState = {
-  date: "",
-  closed: true,
-  start: "10:00",
-  end: "18:00",
-  note: "",
-};
-
-export function ExceptionsList({
-  initial,
-}: {
-  initial: AvailabilityExceptionDto[];
-}) {
-  const [items, setItems] = useState<AvailabilityExceptionDto[]>(initial);
-  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
-  const [submitting, setSubmitting] = useState(false);
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload: AvailabilityExceptionInput = {
-      date: form.date,
-      start: form.closed ? null : form.start,
-      end: form.closed ? null : form.end,
-      note: form.note.trim() || null,
-    };
-
-    const parsed = AvailabilityExceptionInputSchema.safeParse(payload);
-    if (!parsed.success) {
-      toast.error("入力に誤りがあります");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/availability/exceptions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(body.message ?? `HTTP ${res.status}`);
-      }
-      const created = (await res.json()) as AvailabilityExceptionDto;
-      setItems((prev) =>
-        [...prev, created].sort((a, b) => a.date.localeCompare(b.date)),
-      );
-      setForm(DEFAULT_FORM);
-      toast.success("例外日を追加しました");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "保存に失敗しました");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const remove = async (id: string) => {
-    try {
-      const res = await fetch(`/api/availability/exceptions/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setItems((prev) => prev.filter((e) => e.id !== id));
-      toast.success("削除しました");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? `削除に失敗しました: ${err.message}` : "削除に失敗しました",
-      );
-    }
-  };
-
+export function ExceptionsListView({
+  items,
+  form,
+  submitting,
+  onFormChange,
+  onSubmit,
+  onRemove,
+}: ExceptionsListViewProps) {
   return (
     <Card>
       <CardHeader>
@@ -132,7 +65,7 @@ export function ExceptionsList({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => remove(e.id)}
+                  onClick={() => onRemove(e.id)}
                   aria-label={`${e.date} の例外を削除`}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -155,7 +88,9 @@ export function ExceptionsList({
                 type="date"
                 required
                 value={form.date}
-                onChange={(e) => setForm((s) => ({ ...s, date: e.target.value }))}
+                onChange={(e) =>
+                  onFormChange((s) => ({ ...s, date: e.target.value }))
+                }
               />
             </div>
             <div className="flex items-end gap-2">
@@ -163,7 +98,7 @@ export function ExceptionsList({
                 id="ex-closed"
                 checked={form.closed}
                 onCheckedChange={(v) =>
-                  setForm((s) => ({ ...s, closed: v }))
+                  onFormChange((s) => ({ ...s, closed: v }))
                 }
               />
               <Label htmlFor="ex-closed" className="cursor-pointer pb-0.5">
@@ -181,7 +116,7 @@ export function ExceptionsList({
                   type="time"
                   value={form.start}
                   onChange={(e) =>
-                    setForm((s) => ({ ...s, start: e.target.value }))
+                    onFormChange((s) => ({ ...s, start: e.target.value }))
                   }
                 />
               </div>
@@ -193,7 +128,7 @@ export function ExceptionsList({
                   type="time"
                   value={form.end}
                   onChange={(e) =>
-                    setForm((s) => ({ ...s, end: e.target.value }))
+                    onFormChange((s) => ({ ...s, end: e.target.value }))
                   }
                 />
               </div>
@@ -207,7 +142,9 @@ export function ExceptionsList({
               placeholder="例: 通院のため"
               maxLength={200}
               value={form.note}
-              onChange={(e) => setForm((s) => ({ ...s, note: e.target.value }))}
+              onChange={(e) =>
+                onFormChange((s) => ({ ...s, note: e.target.value }))
+              }
             />
           </div>
 

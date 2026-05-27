@@ -1,79 +1,40 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { addMonths, startOfDay } from "date-fns";
 import { ja } from "date-fns/locale";
-import { CalendarCheck, CheckCircle2, ChevronRight, FileText, Settings2 } from "lucide-react";
+import {
+  CalendarCheck,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  Settings2,
+} from "lucide-react";
 import { formatJst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Meeting } from "@/lib/use-meetings";
 import type { ManagedProposal } from "@/features/proposal/ProposalManageDialog";
 import type { ConfirmTarget } from "@/features/proposal/ConfirmMeetingDialog";
+import type { ProposalListItem } from "./service";
 
-type ProposalListItem = {
-  id: string;
-  label: string;
-  status: "OPEN" | "CONFIRMED" | "CANCELLED";
-  slots: { id: string; start: string; end: string }[];
-};
-
-type ProposalsResponse = { proposals: ProposalListItem[] };
-type MeetingsResponse = { meetings: Meeting[] };
-
-const fetchOpenProposals = async (from: Date): Promise<ProposalListItem[]> => {
-  const url = new URL("/api/proposals", window.location.origin);
-  url.searchParams.set("status", "OPEN");
-  url.searchParams.set("from", from.toISOString());
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = (await res.json()) as ProposalsResponse;
-  return data.proposals;
-};
-
-const fetchFutureMeetings = async (from: Date, to: Date): Promise<Meeting[]> => {
-  const url = new URL("/api/meetings", window.location.origin);
-  url.searchParams.set("from", from.toISOString());
-  url.searchParams.set("to", to.toISOString());
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = (await res.json()) as MeetingsResponse;
-  return data.meetings;
-};
-
-type Props = {
+export type SidebarListsViewProps = {
+  proposals: ProposalListItem[];
+  meetings: Meeting[];
+  expanded: Set<string>;
+  onToggle: (id: string) => void;
   onProposalOpen: (p: ManagedProposal) => void;
   onMeetingOpen: (m: Meeting) => void;
   onSlotConfirm: (target: ConfirmTarget) => void;
 };
 
-export function SidebarLists({ onProposalOpen, onMeetingOpen, onSlotConfirm }: Props) {
-  const from = useMemo(() => startOfDay(new Date()), []);
-  const to = useMemo(() => addMonths(from, 6), [from]);
-
-  const { data: proposals = [] } = useQuery({
-    queryKey: ["proposals", "sidebar", from.toISOString()],
-    queryFn: () => fetchOpenProposals(from),
-    staleTime: 30_000,
-  });
-
-  const { data: meetings = [] } = useQuery({
-    queryKey: ["meetings", "sidebar", from.toISOString(), to.toISOString()],
-    queryFn: () => fetchFutureMeetings(from, to),
-    staleTime: 30_000,
-  });
-
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
+export function SidebarListsView({
+  proposals,
+  meetings,
+  expanded,
+  onToggle,
+  onProposalOpen,
+  onMeetingOpen,
+  onSlotConfirm,
+}: SidebarListsViewProps) {
   return (
     <div className="flex flex-col gap-4 px-4 py-3 text-sm">
       <section>
@@ -98,7 +59,7 @@ export function SidebarLists({ onProposalOpen, onMeetingOpen, onSlotConfirm }: P
                 >
                   <button
                     type="button"
-                    onClick={() => toggle(p.id)}
+                    onClick={() => onToggle(p.id)}
                     aria-expanded={isOpen}
                     className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left transition-colors hover:bg-amber-100/70 dark:hover:bg-amber-950/40"
                   >

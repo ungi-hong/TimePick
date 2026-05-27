@@ -1,11 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { toast } from "sonner";
 import { CheckCircle2, Copy, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,201 +16,80 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatJst } from "@/lib/datetime";
+import type {
+  Phase,
+  SelectableCandidate,
+  Candidate,
+} from "./service";
 
-type Candidate = { start: string; end: string };
-type SelectableCandidate = Candidate & { selected: boolean };
-type Phase = "input" | "preview" | "saved";
-
-const defaultPeriod = () => {
-  const f = new Date();
-  const t = new Date();
-  t.setDate(t.getDate() + 14);
-  return { from: format(f, "yyyy-MM-dd"), to: format(t, "yyyy-MM-dd") };
-};
-
-const groupByDate = <T extends Candidate>(items: T[]): Array<[string, T[]]> => {
-  const map = new Map<string, T[]>();
-  for (const c of items) {
-    const key = formatJst(c.start, "yyyy-MM-dd");
-    const list = map.get(key) ?? [];
-    list.push(c);
-    map.set(key, list);
-  }
-  return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-};
-
-const buildCopyText = (
-  groups: Array<[string, Candidate[]]>,
-  showYear: boolean,
-): string =>
-  groups
-    .map(([dateKey, items]) => {
-      if (items.length === 0) return null;
-      const sample = new Date(`${dateKey}T00:00:00+09:00`);
-      const datePart = formatJst(
-        sample,
-        showYear ? "yyyy年 M月d日(E)" : "M月d日(E)",
-        { locale: ja },
-      );
-      const ranges = items
-        .map(
-          (c) => `${formatJst(c.start, "HH:mm")} 〜 ${formatJst(c.end, "HH:mm")}`,
-        )
-        .join(" または ");
-      return `${datePart} ${ranges}`;
-    })
-    .filter((line): line is string => line !== null)
-    .join("\n");
-
-type Props = {
+export type ProposalGenerateDialogViewProps = {
   disabled?: boolean;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  phase: Phase;
+  onPhaseBack: () => void;
+
+  label: string;
+  onLabelChange: (v: string) => void;
+  from: string;
+  onFromChange: (v: string) => void;
+  to: string;
+  onToChange: (v: string) => void;
+  minRangeMinutes: number;
+  onMinRangeMinutesChange: (v: number) => void;
+  bufferAfterMinutes: number;
+  onBufferAfterMinutesChange: (v: number) => void;
+
+  generating: boolean;
+  saving: boolean;
+  candidates: SelectableCandidate[];
+  previewGroups: Array<[string, SelectableCandidate[]]>;
+  selectedCount: number;
+  onGenerate: (e: React.FormEvent) => void;
+  onSetAll: (selected: boolean) => void;
+  onToggle: (index: number, checked: boolean) => void;
+  onSave: () => void;
+
+  savedLabel: string;
+  savedCandidates: Candidate[];
+  showYear: boolean;
+  onShowYearChange: (v: boolean) => void;
+  copyText: string;
+  onCopy: () => void;
 };
 
-export function ProposalGenerateDialog({ disabled }: Props) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [phase, setPhase] = useState<Phase>("input");
-
-  // 入力フォーム state
-  const [label, setLabel] = useState("");
-  const initialPeriod = defaultPeriod();
-  const [from, setFrom] = useState(initialPeriod.from);
-  const [to, setTo] = useState(initialPeriod.to);
-  const [minRangeMinutes, setMinRangeMinutes] = useState(60);
-  const [bufferAfterMinutes, setBufferAfterMinutes] = useState(30);
-
-  // 動作 state
-  const [generating, setGenerating] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [candidates, setCandidates] = useState<SelectableCandidate[]>([]);
-
-  // 保存後 state
-  const [savedLabel, setSavedLabel] = useState("");
-  const [savedCandidates, setSavedCandidates] = useState<Candidate[]>([]);
-  const [showYear, setShowYear] = useState(false);
-
-  const reset = () => {
-    setPhase("input");
-    setLabel("");
-    const p = defaultPeriod();
-    setFrom(p.from);
-    setTo(p.to);
-    setMinRangeMinutes(60);
-    setBufferAfterMinutes(30);
-    setCandidates([]);
-    setSavedLabel("");
-    setSavedCandidates([]);
-    setShowYear(false);
-    setGenerating(false);
-    setSaving(false);
-  };
-
-  const onOpenChange = (v: boolean) => {
-    setOpen(v);
-    if (!v) reset();
-  };
-
-  // -------- input → preview --------
-  const generate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!from || !to) {
-      toast.error("期間を入力してください");
-      return;
-    }
-    setGenerating(true);
-    try {
-      const res = await fetch("/api/proposals/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: new Date(`${from}T00:00:00+09:00`).toISOString(),
-          to: new Date(`${to}T23:59:59+09:00`).toISOString(),
-          minRangeMinutes,
-          bufferAfterMinutes,
-        }),
-      });
-      if (!res.ok) {
-        if (res.status === 412) {
-          throw new Error("Google Calendar が連携されていません");
-        }
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as { candidates: Candidate[] };
-      if (data.candidates.length === 0) {
-        toast.info("指定期間に空き時間が見つかりませんでした");
-      }
-      setCandidates(data.candidates.map((c) => ({ ...c, selected: false })));
-      setPhase("preview");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "生成に失敗しました");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  // -------- preview helpers --------
-  const previewGroups = useMemo(() => groupByDate(candidates), [candidates]);
-  const selectedCandidates = candidates.filter((c) => c.selected);
-
-  const setAll = (selected: boolean) =>
-    setCandidates((prev) => prev.map((c) => ({ ...c, selected })));
-
-  const toggle = (index: number, checked: boolean) =>
-    setCandidates((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, selected: checked } : c)),
-    );
-
-  // -------- preview → saved --------
-  const save = async () => {
-    if (!label.trim()) {
-      toast.error("ラベル (会社名など) を入力してください");
-      return;
-    }
-    if (selectedCandidates.length === 0) {
-      toast.error("少なくとも 1 つの候補を選んでください");
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await fetch("/api/proposals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label: label.trim(),
-          slots: selectedCandidates.map((c) => ({ start: c.start, end: c.end })),
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setSavedLabel(label.trim());
-      setSavedCandidates(
-        selectedCandidates.map((c) => ({ start: c.start, end: c.end })),
-      );
-      setPhase("saved");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["proposals"] }),
-        queryClient.invalidateQueries({ queryKey: ["busy"] }),
-      ]);
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "保存に失敗しました");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // -------- saved helpers --------
-  const savedGroups = useMemo(() => groupByDate(savedCandidates), [savedCandidates]);
-  const copyText = useMemo(
-    () => buildCopyText(savedGroups, showYear),
-    [savedGroups, showYear],
-  );
-
-  const copyToClipboard = async () => {
-    await navigator.clipboard.writeText(copyText);
-    toast.success("コピーしました");
-  };
-
+export function ProposalGenerateDialogView({
+  disabled,
+  open,
+  onOpenChange,
+  phase,
+  onPhaseBack,
+  label,
+  onLabelChange,
+  from,
+  onFromChange,
+  to,
+  onToChange,
+  minRangeMinutes,
+  onMinRangeMinutesChange,
+  bufferAfterMinutes,
+  onBufferAfterMinutesChange,
+  generating,
+  saving,
+  candidates,
+  previewGroups,
+  selectedCount,
+  onGenerate,
+  onSetAll,
+  onToggle,
+  onSave,
+  savedLabel,
+  savedCandidates,
+  showYear,
+  onShowYearChange,
+  copyText,
+  onCopy,
+}: ProposalGenerateDialogViewProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger
@@ -232,7 +106,6 @@ export function ProposalGenerateDialog({ disabled }: Props) {
         候補を生成
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
-        {/* ----- phase: input ----- */}
         {phase === "input" && (
           <>
             <DialogHeader>
@@ -241,13 +114,13 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                 稼働時間から busy 時間と既存の候補・確定面談を除いた空き時間レンジを抽出します。
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={generate} className="space-y-4">
+            <form onSubmit={onGenerate} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="pg-label">ラベル (会社名など)</Label>
                 <Input
                   id="pg-label"
                   value={label}
-                  onChange={(e) => setLabel(e.target.value)}
+                  onChange={(e) => onLabelChange(e.target.value)}
                   placeholder="例: ABC 株式会社 一次面接"
                   required
                   maxLength={100}
@@ -261,7 +134,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                     type="date"
                     required
                     value={from}
-                    onChange={(e) => setFrom(e.target.value)}
+                    onChange={(e) => onFromChange(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -271,7 +144,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                     type="date"
                     required
                     value={to}
-                    onChange={(e) => setTo(e.target.value)}
+                    onChange={(e) => onToChange(e.target.value)}
                   />
                 </div>
               </div>
@@ -286,7 +159,9 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                     step={15}
                     required
                     value={minRangeMinutes}
-                    onChange={(e) => setMinRangeMinutes(Number(e.target.value))}
+                    onChange={(e) =>
+                      onMinRangeMinutesChange(Number(e.target.value))
+                    }
                   />
                   <p className="text-[11px] text-muted-foreground">
                     これより短い空きは候補にしません
@@ -303,7 +178,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                     required
                     value={bufferAfterMinutes}
                     onChange={(e) =>
-                      setBufferAfterMinutes(Number(e.target.value))
+                      onBufferAfterMinutesChange(Number(e.target.value))
                     }
                   />
                   <p className="text-[11px] text-muted-foreground">
@@ -320,7 +195,6 @@ export function ProposalGenerateDialog({ disabled }: Props) {
           </>
         )}
 
-        {/* ----- phase: preview ----- */}
         {phase === "preview" && (
           <>
             <DialogHeader>
@@ -334,7 +208,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                 ラベル:{" "}
                 <span className="font-medium text-foreground">{label}</span>
                 <span className="ml-2">
-                  / 選択 {selectedCandidates.length} / 全 {candidates.length}
+                  / 選択 {selectedCount} / 全 {candidates.length}
                 </span>
               </div>
 
@@ -349,7 +223,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setAll(true)}
+                      onClick={() => onSetAll(true)}
                     >
                       全選択
                     </Button>
@@ -357,7 +231,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setAll(false)}
+                      onClick={() => onSetAll(false)}
                     >
                       全解除
                     </Button>
@@ -385,7 +259,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
                                 <Checkbox
                                   checked={c.selected}
                                   onCheckedChange={(checked) =>
-                                    toggle(idx, !!checked)
+                                    onToggle(idx, !!checked)
                                   }
                                 />
                                 <span>
@@ -403,17 +277,13 @@ export function ProposalGenerateDialog({ disabled }: Props) {
               )}
             </div>
             <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPhase("input")}
-              >
+              <Button type="button" variant="outline" onClick={onPhaseBack}>
                 戻る
               </Button>
               <Button
                 type="button"
-                onClick={save}
-                disabled={saving || selectedCandidates.length === 0}
+                onClick={onSave}
+                disabled={saving || selectedCount === 0}
               >
                 {saving ? "保存中…" : "保存"}
               </Button>
@@ -421,7 +291,6 @@ export function ProposalGenerateDialog({ disabled }: Props) {
           </>
         )}
 
-        {/* ----- phase: saved ----- */}
         {phase === "saved" && (
           <>
             <DialogHeader>
@@ -443,7 +312,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
               <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <Checkbox
                   checked={showYear}
-                  onCheckedChange={(v) => setShowYear(!!v)}
+                  onCheckedChange={(v) => onShowYearChange(!!v)}
                 />
                 年を含める
               </label>
@@ -458,7 +327,7 @@ export function ProposalGenerateDialog({ disabled }: Props) {
               </div>
             </div>
             <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
-              <Button type="button" onClick={copyToClipboard}>
+              <Button type="button" onClick={onCopy}>
                 <Copy className="h-4 w-4" />
                 コピー
               </Button>

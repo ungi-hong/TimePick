@@ -1,11 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { toast } from "sonner";
 import { ExternalLink, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,114 +17,60 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatJst } from "@/lib/datetime";
 import { renderLinkified } from "@/lib/linkify";
-import type { Meeting } from "@/lib/use-meetings";
+import type { Meeting } from "./service";
 
-type Props = {
-  meeting: Meeting | null;
+export type MeetingDialogViewProps = {
+  meeting: Meeting;
+  editing: boolean;
+  onEditingChange: (v: boolean) => void;
+  title: string;
+  onTitleChange: (v: string) => void;
+  companyName: string;
+  onCompanyNameChange: (v: string) => void;
+  meetingUrl: string;
+  onMeetingUrlChange: (v: string) => void;
+  description: string;
+  onDescriptionChange: (v: string) => void;
+  date: string;
+  onDateChange: (v: string) => void;
+  startTime: string;
+  onStartTimeChange: (v: string) => void;
+  endTime: string;
+  onEndTimeChange: (v: string) => void;
+  busy: boolean;
   onClose: () => void;
+  onSave: (e: React.FormEvent) => void;
+  onDelete: () => void;
 };
 
-export function MeetingDialog({ meeting, onClose }: Props) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [meetingUrl, setMeetingUrl] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const meetingKey = meeting?.id ?? null;
-  const [appliedKey, setAppliedKey] = useState<string | null>(null);
-  if (meeting && meetingKey !== appliedKey) {
-    setEditing(false);
-    setTitle(meeting.title);
-    setCompanyName(meeting.companyName);
-    setMeetingUrl(meeting.meetingUrl ?? "");
-    setDescription(meeting.description ?? "");
-    setDate(formatJst(meeting.start, "yyyy-MM-dd"));
-    setStartTime(formatJst(meeting.start, "HH:mm"));
-    setEndTime(formatJst(meeting.end, "HH:mm"));
-    setAppliedKey(meetingKey);
-  }
-
-  const handleClose = () => {
-    setEditing(false);
-    setAppliedKey(null);
-    onClose();
-  };
-
-  if (!meeting) return null;
-
-  const onSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !companyName.trim()) {
-      toast.error("題名と会社名は必須です");
-      return;
-    }
-    if (!date || !startTime || !endTime || startTime >= endTime) {
-      toast.error("時刻を確認してください");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const start = new Date(`${date}T${startTime}:00+09:00`).toISOString();
-      const end = new Date(`${date}T${endTime}:00+09:00`).toISOString();
-      const res = await fetch(`/api/meetings/${meeting.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          companyName: companyName.trim(),
-          meetingUrl: meetingUrl.trim() ? meetingUrl.trim() : null,
-          description: description.trim() ? description.trim() : null,
-          start,
-          end,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      toast.success("面談を更新しました");
-      await queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      router.refresh();
-      handleClose();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "更新に失敗しました");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onDelete = async () => {
-    if (!confirm("この面談を削除しますか? Google Calendar からも削除されます。")) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/meetings/${meeting.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success("面談を削除しました");
-      await queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      await queryClient.invalidateQueries({ queryKey: ["proposals"] });
-      router.refresh();
-      handleClose();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "削除に失敗しました");
-    } finally {
-      setBusy(false);
-    }
-  };
-
+export function MeetingDialogView({
+  meeting,
+  editing,
+  onEditingChange,
+  title,
+  onTitleChange,
+  companyName,
+  onCompanyNameChange,
+  meetingUrl,
+  onMeetingUrlChange,
+  description,
+  onDescriptionChange,
+  date,
+  onDateChange,
+  startTime,
+  onStartTimeChange,
+  endTime,
+  onEndTimeChange,
+  busy,
+  onClose,
+  onSave,
+  onDelete,
+}: MeetingDialogViewProps) {
   return (
     <Dialog
       open={true}
       onOpenChange={(v) => {
-        if (!v) handleClose();
+        if (!v) onClose();
       }}
     >
       <ResponsiveModalContent>
@@ -151,11 +93,14 @@ export function MeetingDialog({ meeting, onClose }: Props) {
             </div>
             <p className="text-sm">
               {format(
-                new Date(`${formatJst(meeting.start, "yyyy-MM-dd")}T00:00:00+09:00`),
+                new Date(
+                  `${formatJst(meeting.start, "yyyy-MM-dd")}T00:00:00+09:00`,
+                ),
                 "yyyy 年 M 月 d 日 (E)",
                 { locale: ja },
               )}{" "}
-              {formatJst(meeting.start, "HH:mm")} 〜 {formatJst(meeting.end, "HH:mm")}
+              {formatJst(meeting.start, "HH:mm")} 〜{" "}
+              {formatJst(meeting.end, "HH:mm")}
             </p>
             {meeting.meetingUrl && (
               <p>
@@ -188,10 +133,10 @@ export function MeetingDialog({ meeting, onClose }: Props) {
                 削除
               </Button>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={handleClose}>
+                <Button type="button" variant="outline" onClick={onClose}>
                   閉じる
                 </Button>
-                <Button type="button" onClick={() => setEditing(true)}>
+                <Button type="button" onClick={() => onEditingChange(true)}>
                   編集
                 </Button>
               </div>
@@ -206,7 +151,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
                 required
                 maxLength={200}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => onTitleChange(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -216,7 +161,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
                 required
                 maxLength={200}
                 value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                onChange={(e) => onCompanyNameChange(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -226,7 +171,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
                 type="url"
                 placeholder="https://..."
                 value={meetingUrl}
-                onChange={(e) => setMeetingUrl(e.target.value)}
+                onChange={(e) => onMeetingUrlChange(e.target.value)}
               />
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -237,7 +182,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
                   type="date"
                   required
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => onDateChange(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -247,7 +192,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
                   type="time"
                   required
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
+                  onChange={(e) => onStartTimeChange(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -257,7 +202,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
                   type="time"
                   required
                   value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
+                  onChange={(e) => onEndTimeChange(e.target.value)}
                 />
               </div>
             </div>
@@ -268,7 +213,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
                 rows={3}
                 maxLength={2000}
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => onDescriptionChange(e.target.value)}
               />
             </div>
 
@@ -276,7 +221,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setEditing(false)}
+                onClick={() => onEditingChange(false)}
               >
                 キャンセル
               </Button>

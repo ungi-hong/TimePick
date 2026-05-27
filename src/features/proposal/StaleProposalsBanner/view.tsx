@@ -1,12 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { differenceInDays } from "date-fns";
 import { ja } from "date-fns/locale";
 import { AlertTriangle, BellOff, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,87 +13,32 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatJst } from "@/lib/datetime";
+import type { StaleProposal } from "./service";
 
-type StaleProposal = {
-  id: string;
-  label: string;
-  updatedAt: string;
-  slots: { id: string; start: string; end: string }[];
+export type StaleProposalsBannerViewProps = {
+  stale: StaleProposal[];
+  threshold: number;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  busyId: string | null;
+  onIgnore: (id: string) => void;
+  onRemove: (id: string, label: string) => void;
 };
 
-type Response = { thresholdDays: number; proposals: StaleProposal[] };
-
-const fetchStale = async (): Promise<Response> => {
-  const res = await fetch("/api/proposals/stale");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
-
-export function StaleProposalsBanner() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const { data } = useQuery({
-    queryKey: ["proposals", "stale"],
-    queryFn: fetchStale,
-    staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
-  });
-
-  const stale = data?.proposals ?? [];
-  const threshold = data?.thresholdDays ?? 7;
-
-  const invalidate = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["proposals"] }),
-      queryClient.invalidateQueries({ queryKey: ["busy"] }),
-    ]);
-    router.refresh();
-  };
-
-  const ignore = async (id: string) => {
-    setBusyId(id);
-    try {
-      const res = await fetch(`/api/proposals/${id}/touch`, { method: "POST" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success("候補の更新日時を最新にしました");
-      await invalidate();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "操作に失敗しました");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const remove = async (id: string, label: string) => {
-    if (!confirm(`「${label}」を削除しますか? Google Calendar の候補イベントも削除されます。`)) {
-      return;
-    }
-    setBusyId(id);
-    try {
-      const res = await fetch(`/api/proposals/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(body.message ?? `HTTP ${res.status}`);
-      }
-      toast.success("候補を削除しました");
-      await invalidate();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "削除に失敗しました");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  if (stale.length === 0) return null;
-
+export function StaleProposalsBannerView({
+  stale,
+  threshold,
+  open,
+  onOpenChange,
+  busyId,
+  onIgnore,
+  onRemove,
+}: StaleProposalsBannerViewProps) {
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => onOpenChange(true)}
         className="flex w-full items-center gap-2 border-b bg-amber-100 px-4 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-200/80 sm:px-6 dark:bg-amber-900/30 dark:text-amber-100 dark:hover:bg-amber-900/50"
       >
         <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -108,7 +49,7 @@ export function StaleProposalsBanner() {
         <span className="text-xs underline">詳細を見る</span>
       </button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>長期間更新のない候補</DialogTitle>
@@ -151,7 +92,7 @@ export function StaleProposalsBanner() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => ignore(p.id)}
+                        onClick={() => onIgnore(p.id)}
                         disabled={busyId === p.id}
                       >
                         <BellOff className="h-4 w-4" />
@@ -161,7 +102,7 @@ export function StaleProposalsBanner() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => remove(p.id, p.label)}
+                        onClick={() => onRemove(p.id, p.label)}
                         disabled={busyId === p.id}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -175,7 +116,11 @@ export function StaleProposalsBanner() {
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               閉じる
             </Button>
           </DialogFooter>
