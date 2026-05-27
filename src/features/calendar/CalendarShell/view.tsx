@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { startOfDay } from "date-fns";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,51 +28,61 @@ import {
 } from "@/features/calendar/EventInfoDialog";
 import type { Meeting } from "@/lib/use-meetings";
 
-type Props = {
+export type CalendarShellViewProps = {
   calendarConnected: boolean;
+  selectedDate: Date;
+  onSelectedDateChange: (d: Date) => void;
+  confirmTarget: ConfirmTarget | null;
+  onConfirmTargetChange: (t: ConfirmTarget | null) => void;
+  meetingTarget: Meeting | null;
+  onMeetingTargetChange: (m: Meeting | null) => void;
+  proposalTarget: ManagedProposal | null;
+  onProposalTargetChange: (p: ManagedProposal | null) => void;
+  infoTarget: EventInfo | null;
+  onInfoTargetChange: (i: EventInfo | null) => void;
+  mobileOpen: boolean;
+  onMobileOpenChange: (v: boolean) => void;
+  onMobileProposalOpen: (p: ManagedProposal) => void;
+  onMobileMeetingOpen: (m: Meeting) => void;
+  onMobileConfirmOpen: (t: ConfirmTarget) => void;
 };
 
-export function CalendarShell({ calendarConnected }: Props) {
-  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
-  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
-  const [meetingTarget, setMeetingTarget] = useState<Meeting | null>(null);
-  const [proposalTarget, setProposalTarget] = useState<ManagedProposal | null>(
-    null,
-  );
-  const [infoTarget, setInfoTarget] = useState<EventInfo | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const openProposalFromMobile = (p: ManagedProposal) => {
-    setMobileOpen(false);
-    setProposalTarget(p);
-  };
-  const openMeetingFromMobile = (m: Meeting) => {
-    setMobileOpen(false);
-    setMeetingTarget(m);
-  };
-  const openConfirmFromMobile = (t: ConfirmTarget) => {
-    setMobileOpen(false);
-    setConfirmTarget(t);
-  };
-
+export function CalendarShellView({
+  calendarConnected,
+  selectedDate,
+  onSelectedDateChange,
+  confirmTarget,
+  onConfirmTargetChange,
+  meetingTarget,
+  onMeetingTargetChange,
+  proposalTarget,
+  onProposalTargetChange,
+  infoTarget,
+  onInfoTargetChange,
+  mobileOpen,
+  onMobileOpenChange,
+  onMobileProposalOpen,
+  onMobileMeetingOpen,
+  onMobileConfirmOpen,
+}: CalendarShellViewProps) {
   return (
     <div className="flex flex-1 overflow-hidden">
       <aside className="hidden w-72 shrink-0 flex-col overflow-y-auto border-r md:flex">
         <MiniCalendar
           selectedDate={selectedDate}
-          onSelectedDateChange={setSelectedDate}
+          onSelectedDateChange={onSelectedDateChange}
         />
         <Separator />
         <SidebarLists
-          onProposalOpen={setProposalTarget}
-          onMeetingOpen={setMeetingTarget}
-          onSlotConfirm={setConfirmTarget}
+          onProposalOpen={onProposalTargetChange}
+          onMeetingOpen={onMeetingTargetChange}
+          onSlotConfirm={onConfirmTargetChange}
         />
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden bg-muted/30">
         <div className="flex items-center gap-2 border-b bg-background px-3 py-2 md:hidden">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
             <SheetTrigger
               render={
                 <Button
@@ -92,9 +100,9 @@ export function CalendarShell({ calendarConnected }: Props) {
               </SheetHeader>
               <div className="flex-1 overflow-y-auto">
                 <SidebarLists
-                  onProposalOpen={openProposalFromMobile}
-                  onMeetingOpen={openMeetingFromMobile}
-                  onSlotConfirm={openConfirmFromMobile}
+                  onProposalOpen={onMobileProposalOpen}
+                  onMeetingOpen={onMobileMeetingOpen}
+                  onSlotConfirm={onMobileConfirmOpen}
                 />
               </div>
             </SheetContent>
@@ -107,10 +115,10 @@ export function CalendarShell({ calendarConnected }: Props) {
             <CalendarView
               calendarConnected={calendarConnected}
               selectedDate={selectedDate}
-              onSelectedDateChange={setSelectedDate}
-              onProposalConfirm={setConfirmTarget}
-              onMeetingOpen={setMeetingTarget}
-              onEventInfoOpen={setInfoTarget}
+              onSelectedDateChange={onSelectedDateChange}
+              onProposalConfirm={onConfirmTargetChange}
+              onMeetingOpen={onMeetingTargetChange}
+              onEventInfoOpen={onInfoTargetChange}
             />
           </div>
         </div>
@@ -118,17 +126,20 @@ export function CalendarShell({ calendarConnected }: Props) {
 
       <ConfirmMeetingDialog
         target={confirmTarget}
-        onClose={() => setConfirmTarget(null)}
+        onClose={() => onConfirmTargetChange(null)}
       />
       <MeetingDialog
         meeting={meetingTarget}
-        onClose={() => setMeetingTarget(null)}
+        onClose={() => onMeetingTargetChange(null)}
       />
       <ProposalManageDialog
         proposal={proposalTarget}
-        onClose={() => setProposalTarget(null)}
+        onClose={() => onProposalTargetChange(null)}
       />
-      <EventInfoDialog info={infoTarget} onClose={() => setInfoTarget(null)} />
+      <EventInfoDialog
+        info={infoTarget}
+        onClose={() => onInfoTargetChange(null)}
+      />
     </div>
   );
 }

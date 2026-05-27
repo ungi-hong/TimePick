@@ -1,48 +1,35 @@
 "use client";
 
-import { useMemo } from "react";
 import {
-  addDays,
   addWeeks,
-  endOfWeek,
   format,
   isSameDay,
   isToday,
-  startOfWeek,
   subWeeks,
 } from "date-fns";
 import { ja } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { endOfJstDay, formatJst, startOfJstDay } from "@/lib/datetime";
-import { useBusyEvents } from "@/lib/use-busy-events";
-import { useProposals } from "@/lib/use-proposals";
-import { useMeetings, type Meeting } from "@/lib/use-meetings";
+import { formatJst, startOfJstDay } from "@/lib/datetime";
+import type { Meeting } from "@/lib/use-meetings";
 import {
   cellEventColorClass,
-  enumerateHolidays,
-  mergeCellEvents,
   overlapsDay,
   type CellEvent,
 } from "@/lib/calendar-events";
 import type { ConfirmTarget } from "@/features/proposal/ConfirmMeetingDialog";
 import type { EventInfo } from "@/features/calendar/EventInfoDialog";
-import { CalendarHeader, type ViewMode } from "@/features/calendar/CalendarHeader";
-
-type Props = {
-  calendarConnected: boolean;
-  selectedDate: Date;
-  onSelectedDateChange: (date: Date) => void;
-  onProposalConfirm: (target: ConfirmTarget) => void;
-  onMeetingOpen: (meeting: Meeting) => void;
-  onEventInfoOpen: (info: EventInfo) => void;
-  view: ViewMode;
-  onViewChange: (v: ViewMode) => void;
-};
+import {
+  CalendarHeader,
+  type ViewMode,
+} from "@/features/calendar/CalendarHeader";
 
 const START_HOUR = 0;
 const END_HOUR = 24;
 const HOUR_HEIGHT = 48;
-const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
+const HOURS = Array.from(
+  { length: END_HOUR - START_HOUR },
+  (_, i) => START_HOUR + i,
+);
 
 const dayWeekColor = (dow: number) => {
   if (dow === 0) return "text-rose-600";
@@ -57,7 +44,10 @@ const eventTitle = (e: CellEvent) => {
   return e.name;
 };
 
-const computeStyle = (event: CellEvent, dayStart: Date): React.CSSProperties | null => {
+const computeStyle = (
+  event: CellEvent,
+  dayStart: Date,
+): React.CSSProperties | null => {
   const dayStartMs = dayStart.getTime();
   const visibleStartMs = dayStartMs + START_HOUR * 3_600_000;
   const visibleEndMs = dayStartMs + END_HOUR * 3_600_000;
@@ -77,8 +67,21 @@ const computeStyle = (event: CellEvent, dayStart: Date): React.CSSProperties | n
   return { top, height };
 };
 
-export function WeekView({
-  calendarConnected,
+export type WeekViewViewProps = {
+  selectedDate: Date;
+  onSelectedDateChange: (date: Date) => void;
+  onProposalConfirm: (target: ConfirmTarget) => void;
+  onMeetingOpen: (meeting: Meeting) => void;
+  onEventInfoOpen: (info: EventInfo) => void;
+  view: ViewMode;
+  onViewChange: (v: ViewMode) => void;
+  weekStart: Date;
+  weekEnd: Date;
+  days: Date[];
+  events: CellEvent[];
+};
+
+export function WeekViewView({
   selectedDate,
   onSelectedDateChange,
   onProposalConfirm,
@@ -86,39 +89,11 @@ export function WeekView({
   onEventInfoOpen,
   view,
   onViewChange,
-}: Props) {
-  const weekStart = useMemo(
-    () => startOfWeek(selectedDate, { weekStartsOn: 0 }),
-    [selectedDate],
-  );
-  const weekEnd = useMemo(
-    () => endOfWeek(selectedDate, { weekStartsOn: 0 }),
-    [selectedDate],
-  );
-  const days = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
-    [weekStart],
-  );
-
-  const from = useMemo(() => startOfJstDay(weekStart), [weekStart]);
-  const to = useMemo(() => endOfJstDay(weekEnd), [weekEnd]);
-
-  const { data: busy = [] } = useBusyEvents({
-    from,
-    to,
-    enabled: calendarConnected,
-  });
-  const { data: proposals = [] } = useProposals({ from, to, status: "OPEN" });
-  const { data: meetings = [] } = useMeetings({ from, to });
-
-  const events = useMemo(
-    () => [
-      ...mergeCellEvents(busy, proposals, meetings),
-      ...enumerateHolidays(from, to),
-    ],
-    [busy, proposals, meetings, from, to],
-  );
-
+  weekStart,
+  weekEnd,
+  days,
+  events,
+}: WeekViewViewProps) {
   const onClickEvent = (e: CellEvent) => {
     if (e.type === "proposal") {
       onProposalConfirm({
@@ -168,7 +143,6 @@ export function WeekView({
         onToday={() => onSelectedDateChange(new Date())}
       />
 
-      {/* 日付ヘッダー (sticky) */}
       <div className="flex border-b bg-background">
         <div className="w-14 shrink-0 border-r" />
         {days.map((d) => {
@@ -202,7 +176,6 @@ export function WeekView({
         })}
       </div>
 
-      {/* 終日 (祝日 / all-day busy) を上に */}
       {(() => {
         const allDay = events.filter(
           (e) => e.type === "holiday" || (e.type === "busy" && e.allDay),
@@ -240,13 +213,11 @@ export function WeekView({
         );
       })()}
 
-      {/* 時間グリッド */}
       <div className="flex-1 overflow-y-auto">
         <div
           className="relative flex"
           style={{ height: HOURS.length * HOUR_HEIGHT }}
         >
-          {/* 時間ラベル */}
           <div className="w-14 shrink-0 border-r">
             {HOURS.map((h) => (
               <div
@@ -261,7 +232,6 @@ export function WeekView({
             ))}
           </div>
 
-          {/* 7 日カラム */}
           {days.map((d) => {
             const dayStart = startOfJstDay(d);
             const dayTimedEvents = events

@@ -1,19 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
 import {
-  addDays,
-  addMonths,
-  endOfMonth,
-  endOfWeek,
   format,
   getDay,
   isSameDay,
   isSameMonth,
   isToday,
-  startOfMonth,
-  startOfWeek,
-  subMonths,
 } from "date-fns";
 import { ja } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -27,29 +19,23 @@ const weekdayColor = (dayOfWeek: number) => {
   return "text-foreground";
 };
 
-type Props = {
+export type MiniCalendarViewProps = {
   selectedDate: Date;
+  cursor: Date;
+  days: Date[];
   onSelectedDateChange: (date: Date) => void;
+  onPrev: () => void;
+  onNext: () => void;
 };
 
-export function MiniCalendar({ selectedDate, onSelectedDateChange }: Props) {
-  const cursor = useMemo(() => startOfMonth(selectedDate), [selectedDate]);
-
-  const days = useMemo(() => {
-    const gridStart = startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 });
-    const gridEnd = endOfWeek(endOfMonth(cursor), { weekStartsOn: 0 });
-    const list: Date[] = [];
-    let d = gridStart;
-    while (d <= gridEnd) {
-      list.push(d);
-      d = addDays(d, 1);
-    }
-    return list;
-  }, [cursor]);
-
-  const goPrev = () => onSelectedDateChange(subMonths(selectedDate, 1));
-  const goNext = () => onSelectedDateChange(addMonths(selectedDate, 1));
-
+export function MiniCalendarView({
+  selectedDate,
+  cursor,
+  days,
+  onSelectedDateChange,
+  onPrev,
+  onNext,
+}: MiniCalendarViewProps) {
   return (
     <div className="flex flex-col gap-2 p-4">
       <div className="flex items-center justify-between">
@@ -59,7 +45,7 @@ export function MiniCalendar({ selectedDate, onSelectedDateChange }: Props) {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={goPrev}
+            onClick={onPrev}
             aria-label="前の月"
             className="rounded p-1 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
           >
@@ -67,7 +53,7 @@ export function MiniCalendar({ selectedDate, onSelectedDateChange }: Props) {
           </button>
           <button
             type="button"
-            onClick={goNext}
+            onClick={onNext}
             aria-label="次の月"
             className="rounded p-1 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
           >

@@ -1,39 +1,28 @@
 "use client";
 
-import { useMemo } from "react";
 import { addDays, format, isToday, subDays } from "date-fns";
 import { ja } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { endOfJstDay, formatJst, startOfJstDay } from "@/lib/datetime";
-import { useBusyEvents } from "@/lib/use-busy-events";
-import { useProposals } from "@/lib/use-proposals";
-import { useMeetings, type Meeting } from "@/lib/use-meetings";
+import { formatJst } from "@/lib/datetime";
+import type { Meeting } from "@/lib/use-meetings";
 import {
   cellEventColorClass,
-  enumerateHolidays,
-  mergeCellEvents,
-  overlapsDay,
   type CellEvent,
 } from "@/lib/calendar-events";
 import type { ConfirmTarget } from "@/features/proposal/ConfirmMeetingDialog";
 import type { EventInfo } from "@/features/calendar/EventInfoDialog";
-import { CalendarHeader, type ViewMode } from "@/features/calendar/CalendarHeader";
-
-type Props = {
-  calendarConnected: boolean;
-  selectedDate: Date;
-  onSelectedDateChange: (date: Date) => void;
-  onProposalConfirm: (target: ConfirmTarget) => void;
-  onMeetingOpen: (meeting: Meeting) => void;
-  onEventInfoOpen: (info: EventInfo) => void;
-  view: ViewMode;
-  onViewChange: (v: ViewMode) => void;
-};
+import {
+  CalendarHeader,
+  type ViewMode,
+} from "@/features/calendar/CalendarHeader";
 
 const START_HOUR = 0;
 const END_HOUR = 24;
-const HOUR_HEIGHT = 48; // px
-const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
+const HOUR_HEIGHT = 48;
+const HOURS = Array.from(
+  { length: END_HOUR - START_HOUR },
+  (_, i) => START_HOUR + i,
+);
 
 const eventTitle = (e: CellEvent) => {
   if (e.type === "busy") return e.summary;
@@ -42,7 +31,10 @@ const eventTitle = (e: CellEvent) => {
   return e.name;
 };
 
-const computeStyle = (event: CellEvent, dayStart: Date): React.CSSProperties | null => {
+const computeStyle = (
+  event: CellEvent,
+  dayStart: Date,
+): React.CSSProperties | null => {
   const dayStartMs = dayStart.getTime();
   const visibleStartMs = dayStartMs + START_HOUR * 3_600_000;
   const visibleEndMs = dayStartMs + END_HOUR * 3_600_000;
@@ -63,8 +55,20 @@ const computeStyle = (event: CellEvent, dayStart: Date): React.CSSProperties | n
   return { top, height };
 };
 
-export function DayView({
-  calendarConnected,
+export type DayViewViewProps = {
+  selectedDate: Date;
+  onSelectedDateChange: (date: Date) => void;
+  onProposalConfirm: (target: ConfirmTarget) => void;
+  onMeetingOpen: (meeting: Meeting) => void;
+  onEventInfoOpen: (info: EventInfo) => void;
+  view: ViewMode;
+  onViewChange: (v: ViewMode) => void;
+  dayStart: Date;
+  allDayEvents: CellEvent[];
+  timedEvents: CellEvent[];
+};
+
+export function DayViewView({
   selectedDate,
   onSelectedDateChange,
   onProposalConfirm,
@@ -72,37 +76,10 @@ export function DayView({
   onEventInfoOpen,
   view,
   onViewChange,
-}: Props) {
-  const dayStart = useMemo(() => startOfJstDay(selectedDate), [selectedDate]);
-  const dayEnd = useMemo(() => endOfJstDay(selectedDate), [selectedDate]);
-
-  const { data: busy = [] } = useBusyEvents({
-    from: dayStart,
-    to: dayEnd,
-    enabled: calendarConnected,
-  });
-  const { data: proposals = [] } = useProposals({
-    from: dayStart,
-    to: dayEnd,
-    status: "OPEN",
-  });
-  const { data: meetings = [] } = useMeetings({ from: dayStart, to: dayEnd });
-
-  const events = useMemo(() => {
-    const merged = [
-      ...mergeCellEvents(busy, proposals, meetings),
-      ...enumerateHolidays(dayStart, dayEnd),
-    ];
-    return merged.filter((e) => overlapsDay(e, selectedDate));
-  }, [busy, proposals, meetings, dayStart, dayEnd, selectedDate]);
-
-  const allDayEvents = events.filter(
-    (e) => e.type === "holiday" || (e.type === "busy" && e.allDay),
-  );
-  const timedEvents = events.filter(
-    (e) => !(e.type === "holiday" || (e.type === "busy" && e.allDay)),
-  );
-
+  dayStart,
+  allDayEvents,
+  timedEvents,
+}: DayViewViewProps) {
   const today = isToday(selectedDate);
 
   const onClickEvent = (e: CellEvent) => {
@@ -173,8 +150,10 @@ export function DayView({
       )}
 
       <div className="flex-1 overflow-y-auto">
-        <div className="relative flex" style={{ height: HOURS.length * HOUR_HEIGHT }}>
-          {/* 時間ラベル */}
+        <div
+          className="relative flex"
+          style={{ height: HOURS.length * HOUR_HEIGHT }}
+        >
           <div className="w-14 shrink-0 border-r">
             {HOURS.map((h) => (
               <div
@@ -189,9 +168,7 @@ export function DayView({
             ))}
           </div>
 
-          {/* 日のカラム */}
           <div className="relative flex-1">
-            {/* 罫線 */}
             {HOURS.map((h) => (
               <div
                 key={h}
@@ -199,9 +176,7 @@ export function DayView({
                 style={{ height: HOUR_HEIGHT }}
               />
             ))}
-            {/* 今日なら現在時刻ライン */}
             {today && <NowLine />}
-            {/* イベント */}
             {timedEvents.map((e) => {
               const style = computeStyle(e, dayStart);
               if (!style) return null;

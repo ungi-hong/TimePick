@@ -2,17 +2,12 @@
 
 import { useMemo } from "react";
 import {
-  addDays,
   addMonths,
-  endOfMonth,
-  endOfWeek,
   format,
   getDay,
   isSameDay,
   isSameMonth,
   isToday,
-  startOfMonth,
-  startOfWeek,
   subMonths,
 } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -24,20 +19,19 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { endOfJstDay, formatJst, startOfJstDay } from "@/lib/datetime";
-import { useBusyEvents } from "@/lib/use-busy-events";
-import { useProposals } from "@/lib/use-proposals";
-import { useMeetings, type Meeting } from "@/lib/use-meetings";
+import { formatJst } from "@/lib/datetime";
+import type { Meeting } from "@/lib/use-meetings";
 import {
   cellEventColorClass,
-  enumerateHolidays,
-  mergeCellEvents,
   overlapsDay,
   type CellEvent,
 } from "@/lib/calendar-events";
 import type { ConfirmTarget } from "@/features/proposal/ConfirmMeetingDialog";
 import type { EventInfo } from "@/features/calendar/EventInfoDialog";
-import { CalendarHeader, type ViewMode } from "@/features/calendar/CalendarHeader";
+import {
+  CalendarHeader,
+  type ViewMode,
+} from "@/features/calendar/CalendarHeader";
 
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -225,7 +219,7 @@ function DayCell({
   );
 }
 
-type Props = {
+export type MonthViewViewProps = {
   calendarConnected: boolean;
   selectedDate: Date;
   onSelectedDateChange: (date: Date) => void;
@@ -234,9 +228,14 @@ type Props = {
   onEventInfoOpen: (info: EventInfo) => void;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
+  cursor: Date;
+  days: Date[];
+  cellEvents: CellEvent[];
+  isLoading: boolean;
+  error: Error | null;
 };
 
-export function MonthView({
+export function MonthViewView({
   calendarConnected,
   selectedDate,
   onSelectedDateChange,
@@ -245,42 +244,12 @@ export function MonthView({
   onEventInfoOpen,
   view,
   onViewChange,
-}: Props) {
-  const cursor = useMemo(() => startOfMonth(selectedDate), [selectedDate]);
-
-  const { gridStart, gridEnd, days } = useMemo(() => {
-    const monthStart = startOfMonth(cursor);
-    const monthEnd = endOfMonth(cursor);
-    const gs = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const ge = endOfWeek(monthEnd, { weekStartsOn: 0 });
-    const list: Date[] = [];
-    let d = gs;
-    while (d <= ge) {
-      list.push(d);
-      d = addDays(d, 1);
-    }
-    return { gridStart: gs, gridEnd: ge, days: list };
-  }, [cursor]);
-
-  const from = useMemo(() => startOfJstDay(gridStart), [gridStart]);
-  const to = useMemo(() => endOfJstDay(gridEnd), [gridEnd]);
-
-  const { data: busy = [], isLoading, error } = useBusyEvents({
-    from,
-    to,
-    enabled: calendarConnected,
-  });
-  const { data: proposals = [] } = useProposals({ from, to, status: "OPEN" });
-  const { data: meetings = [] } = useMeetings({ from, to });
-
-  const cellEvents = useMemo(
-    () => [
-      ...mergeCellEvents(busy, proposals, meetings),
-      ...enumerateHolidays(from, to),
-    ],
-    [busy, proposals, meetings, from, to],
-  );
-
+  cursor,
+  days,
+  cellEvents,
+  isLoading,
+  error,
+}: MonthViewViewProps) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <CalendarHeader
