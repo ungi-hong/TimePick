@@ -8,6 +8,9 @@ export type BusyEvent = {
   summary: string;
   allDay: boolean;
   googleEventId: string;
+  description: string | null;
+  location: string | null;
+  meetUrl: string | null;
 };
 
 type Options = {

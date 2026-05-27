@@ -25,6 +25,7 @@ import {
   type CellEvent,
 } from "@/lib/calendar-events";
 import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
+import type { EventInfo } from "@/components/EventInfoDialog";
 import { CalendarHeader, type ViewMode } from "@/components/CalendarHeader";
 
 type Props = {
@@ -33,6 +34,7 @@ type Props = {
   onSelectedDateChange: (date: Date) => void;
   onProposalConfirm: (target: ConfirmTarget) => void;
   onMeetingOpen: (meeting: Meeting) => void;
+  onEventInfoOpen: (info: EventInfo) => void;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
 };
@@ -68,6 +70,7 @@ export function ScheduleView({
   onSelectedDateChange,
   onProposalConfirm,
   onMeetingOpen,
+  onEventInfoOpen,
   view,
   onViewChange,
 }: Props) {
@@ -133,6 +136,24 @@ export function ScheduleView({
       });
     } else if (e.type === "meeting") {
       onMeetingOpen(e.meeting);
+    } else if (e.type === "busy") {
+      onEventInfoOpen({
+        type: "busy",
+        summary: e.summary,
+        start: e.start,
+        end: e.end,
+        allDay: e.allDay,
+        description: e.description,
+        location: e.location,
+        meetUrl: e.meetUrl,
+      });
+    } else {
+      onEventInfoOpen({
+        type: "holiday",
+        name: e.name,
+        start: e.start,
+        end: e.end,
+      });
     }
   };
 
@@ -200,20 +221,14 @@ export function ScheduleView({
                         </div>
                         <ul className="flex-1 space-y-1">
                           {d.events.map((e) => {
-                            const clickable =
-                              e.type === "proposal" || e.type === "meeting";
                             return (
                               <li key={e.key}>
                                 <button
                                   type="button"
-                                  disabled={!clickable}
                                   onClick={() => handleClick(e)}
                                   className={cn(
-                                    "block w-full rounded-md px-3 py-2 text-left transition-opacity",
+                                    "block w-full rounded-md px-3 py-2 text-left transition-opacity hover:opacity-80",
                                     cellEventColorClass(e.type),
-                                    clickable
-                                      ? "hover:opacity-80"
-                                      : "cursor-default opacity-90",
                                   )}
                                 >
                                   <span className="block text-sm font-medium">

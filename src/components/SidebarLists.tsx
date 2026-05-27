@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { addMonths, startOfDay } from "date-fns";
 import { ja } from "date-fns/locale";
-import { CalendarCheck, ChevronRight, FileText, Settings2 } from "lucide-react";
+import { CalendarCheck, CheckCircle2, ChevronRight, FileText, Settings2 } from "lucide-react";
 import { formatJst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Meeting } from "@/lib/use-meetings";
 import type { ManagedProposal } from "@/components/ProposalManageDialog";
+import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
 
 type ProposalListItem = {
   id: string;
@@ -44,9 +45,10 @@ const fetchFutureMeetings = async (from: Date, to: Date): Promise<Meeting[]> => 
 type Props = {
   onProposalOpen: (p: ManagedProposal) => void;
   onMeetingOpen: (m: Meeting) => void;
+  onSlotConfirm: (target: ConfirmTarget) => void;
 };
 
-export function SidebarLists({ onProposalOpen, onMeetingOpen }: Props) {
+export function SidebarLists({ onProposalOpen, onMeetingOpen, onSlotConfirm }: Props) {
   const from = useMemo(() => startOfDay(new Date()), []);
   const to = useMemo(() => addMonths(from, 6), [from]);
 
@@ -115,15 +117,36 @@ export function SidebarLists({ onProposalOpen, onMeetingOpen }: Props) {
                   </button>
                   {isOpen && (
                     <div className="border-t border-amber-200/60 bg-background/60 px-2.5 py-2 dark:border-amber-800/40">
-                      <ul className="space-y-0.5">
+                      <ul className="space-y-1">
                         {p.slots.map((s) => (
                           <li
                             key={s.id}
-                            className="text-[11px] text-muted-foreground"
+                            className="flex items-center justify-between gap-2"
                           >
-                            {formatJst(s.start, "M/d (E) HH:mm", { locale: ja })}
-                            {" 〜 "}
-                            {formatJst(s.end, "HH:mm")}
+                            <span className="flex-1 text-[11px] text-muted-foreground">
+                              {formatJst(s.start, "M/d (E) HH:mm", { locale: ja })}
+                              {" 〜 "}
+                              {formatJst(s.end, "HH:mm")}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 shrink-0 px-1.5 text-[11px] text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                              onClick={() =>
+                                onSlotConfirm({
+                                  proposalId: p.id,
+                                  slotId: s.id,
+                                  label: p.label,
+                                  slotStart: s.start,
+                                  slotEnd: s.end,
+                                })
+                              }
+                              aria-label="この候補で確定"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              確定
+                            </Button>
                           </li>
                         ))}
                       </ul>

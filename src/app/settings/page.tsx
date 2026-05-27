@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { auth, signIn } from "@/auth";
 import { Button } from "@/components/ui/button";
@@ -86,9 +87,10 @@ export default async function SettingsPage() {
         <div className="flex items-center gap-2 sm:gap-4">
           <Link
             href="/"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
-            ← ホーム
+            <ChevronLeft className="h-4 w-4" strokeWidth={2.25} />
+            <span>ホーム</span>
           </Link>
           <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
             設定

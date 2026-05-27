@@ -12,6 +12,9 @@ export type CellEvent =
       end: string;
       summary: string;
       allDay: boolean;
+      description: string | null;
+      location: string | null;
+      meetUrl: string | null;
       key: string;
     }
   | {
@@ -62,6 +65,9 @@ export const mergeCellEvents = (
     end: b.end,
     summary: b.summary,
     allDay: b.allDay,
+    description: b.description,
+    location: b.location,
+    meetUrl: b.meetUrl,
     key: `busy-${b.googleEventId}-${i}`,
   })),
   ...proposals.map<CellEvent>((p) => ({

@@ -9,12 +9,12 @@ import { Copy, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveModalContent } from "@/components/ui/responsive-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -164,7 +164,7 @@ export function ProposalManageDialog({ proposal, onClose }: Props) {
 
   return (
     <Dialog open={true} onOpenChange={(v) => !v && close()}>
-      <DialogContent className="sm:max-w-md">
+      <ResponsiveModalContent>
         <DialogHeader>
           <DialogTitle>候補の管理</DialogTitle>
           <DialogDescription>
@@ -246,7 +246,7 @@ export function ProposalManageDialog({ proposal, onClose }: Props) {
             </Button>
           </div>
         </DialogFooter>
-      </DialogContent>
+      </ResponsiveModalContent>
     </Dialog>
   );
 }

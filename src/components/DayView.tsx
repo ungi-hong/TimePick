@@ -16,6 +16,7 @@ import {
   type CellEvent,
 } from "@/lib/calendar-events";
 import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
+import type { EventInfo } from "@/components/EventInfoDialog";
 import { CalendarHeader, type ViewMode } from "@/components/CalendarHeader";
 
 type Props = {
@@ -24,6 +25,7 @@ type Props = {
   onSelectedDateChange: (date: Date) => void;
   onProposalConfirm: (target: ConfirmTarget) => void;
   onMeetingOpen: (meeting: Meeting) => void;
+  onEventInfoOpen: (info: EventInfo) => void;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
 };
@@ -67,6 +69,7 @@ export function DayView({
   onSelectedDateChange,
   onProposalConfirm,
   onMeetingOpen,
+  onEventInfoOpen,
   view,
   onViewChange,
 }: Props) {
@@ -113,6 +116,24 @@ export function DayView({
       });
     } else if (e.type === "meeting") {
       onMeetingOpen(e.meeting);
+    } else if (e.type === "busy") {
+      onEventInfoOpen({
+        type: "busy",
+        summary: e.summary,
+        start: e.start,
+        end: e.end,
+        allDay: e.allDay,
+        description: e.description,
+        location: e.location,
+        meetUrl: e.meetUrl,
+      });
+    } else {
+      onEventInfoOpen({
+        type: "holiday",
+        name: e.name,
+        start: e.start,
+        end: e.end,
+      });
     }
   };
 
@@ -134,14 +155,17 @@ export function DayView({
           </p>
           <ul className="space-y-1">
             {allDayEvents.map((e) => (
-              <li
-                key={e.key}
-                className={cn(
-                  "rounded px-2 py-1 text-xs",
-                  cellEventColorClass(e.type),
-                )}
-              >
-                {eventTitle(e)}
+              <li key={e.key}>
+                <button
+                  type="button"
+                  onClick={() => onClickEvent(e)}
+                  className={cn(
+                    "w-full rounded px-2 py-1 text-left text-xs transition-opacity hover:opacity-80",
+                    cellEventColorClass(e.type),
+                  )}
+                >
+                  {eventTitle(e)}
+                </button>
               </li>
             ))}
           </ul>
@@ -181,18 +205,15 @@ export function DayView({
             {timedEvents.map((e) => {
               const style = computeStyle(e, dayStart);
               if (!style) return null;
-              const clickable = e.type === "proposal" || e.type === "meeting";
               return (
                 <button
                   key={e.key}
                   type="button"
-                  disabled={!clickable}
                   onClick={() => onClickEvent(e)}
                   style={style}
                   className={cn(
-                    "absolute left-1 right-1 overflow-hidden rounded-md border px-2 py-1 text-left text-xs shadow-sm transition-opacity",
+                    "absolute left-1 right-1 overflow-hidden rounded-md border px-2 py-1 text-left text-xs shadow-sm transition-opacity hover:opacity-80",
                     cellEventColorClass(e.type),
-                    clickable ? "hover:opacity-80" : "cursor-default",
                   )}
                 >
                   <div className="font-medium">{eventTitle(e)}</div>

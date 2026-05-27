@@ -8,6 +8,9 @@ export type BusyEvent = {
   summary: string;
   allDay: boolean;
   googleEventId: string;
+  description: string | null;
+  location: string | null;
+  meetUrl: string | null;
 };
 
 export type MeetingEventInput = {
@@ -54,6 +57,14 @@ const getCalendarClient = async (userId: string) => {
   return google.calendar({ version: "v3", auth });
 };
 
+const extractMeetUrl = (e: calendar_v3.Schema$Event): string | null => {
+  if (e.hangoutLink) return e.hangoutLink;
+  const videoEntry = e.conferenceData?.entryPoints?.find(
+    (p) => p.entryPointType === "video" && p.uri,
+  );
+  return videoEntry?.uri ?? null;
+};
+
 const toBusyEvent = (e: calendar_v3.Schema$Event): BusyEvent | null => {
   const allDay = !!e.start?.date && !e.start?.dateTime;
   const startStr = e.start?.dateTime ?? e.start?.date;
@@ -66,6 +77,9 @@ const toBusyEvent = (e: calendar_v3.Schema$Event): BusyEvent | null => {
     summary: e.summary ?? "(無題)",
     allDay,
     googleEventId: e.id ?? "",
+    description: e.description ?? null,
+    location: e.location ?? null,
+    meetUrl: extractMeetUrl(e),
   };
 };
 

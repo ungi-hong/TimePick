@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -9,15 +9,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveModalContent } from "@/components/ui/responsive-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { formatJst } from "@/lib/datetime";
 
 export type ConfirmTarget = {
@@ -33,6 +34,36 @@ type Props = {
   onClose: () => void;
 };
 
+type Duration = 30 | 60;
+
+const toMinutes = (hm: string): number => {
+  const [h, m] = hm.split(":").map(Number);
+  return h * 60 + m;
+};
+
+const fromMinutes = (mins: number): string => {
+  const h = Math.floor(mins / 60)
+    .toString()
+    .padStart(2, "0");
+  const m = (mins % 60).toString().padStart(2, "0");
+  return `${h}:${m}`;
+};
+
+const generateStartOptions = (
+  slotStartHM: string,
+  slotEndHM: string,
+  duration: Duration,
+  step = 30,
+): string[] => {
+  const startMin = toMinutes(slotStartHM);
+  const endMin = toMinutes(slotEndHM);
+  const opts: string[] = [];
+  for (let t = startMin; t + duration <= endMin; t += step) {
+    opts.push(fromMinutes(t));
+  }
+  return opts;
+};
+
 export function ConfirmMeetingDialog({ target, onClose }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -41,9 +72,16 @@ export function ConfirmMeetingDialog({ target, onClose }: Props) {
   const [companyName, setCompanyName] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
   const [description, setDescription] = useState("");
+  const [duration, setDuration] = useState<Duration>(60);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const slotStartHM = target ? formatJst(target.slotStart, "HH:mm") : "";
+  const slotEndHM = target ? formatJst(target.slotEnd, "HH:mm") : "";
+  const slotSpanMinutes = target
+    ? toMinutes(slotEndHM) - toMinutes(slotStartHM)
+    : 0;
 
   // target が変わったときに初期値をセット
   const targetKey = target ? `${target.slotId}` : null;
@@ -53,16 +91,51 @@ export function ConfirmMeetingDialog({ target, onClose }: Props) {
     setCompanyName("");
     setMeetingUrl("");
     setDescription("");
-    setStartTime(formatJst(target.slotStart, "HH:mm"));
-    setEndTime(formatJst(target.slotEnd, "HH:mm"));
+    const initialDuration: Duration = slotSpanMinutes >= 60 ? 60 : 30;
+    setDuration(initialDuration);
+    setStartTime(slotStartHM);
+    setEndTime(
+      fromMinutes(
+        Math.min(toMinutes(slotStartHM) + initialDuration, toMinutes(slotEndHM)),
+      ),
+    );
     setAppliedKey(targetKey);
   }
+
+  const startOptions = useMemo(
+    () =>
+      target ? generateStartOptions(slotStartHM, slotEndHM, duration) : [],
+    [target, slotStartHM, slotEndHM, duration],
+  );
+
+  const applyDuration = (next: Duration) => {
+    setDuration(next);
+    if (!startTime) return;
+    const newEnd = toMinutes(startTime) + next;
+    if (newEnd <= toMinutes(slotEndHM)) {
+      setEndTime(fromMinutes(newEnd));
+    } else {
+      // 現在の開始 + 新しい duration が範囲を超える → 末尾に寄せる
+      const newStart = toMinutes(slotEndHM) - next;
+      if (newStart >= toMinutes(slotStartHM)) {
+        setStartTime(fromMinutes(newStart));
+        setEndTime(slotEndHM);
+      }
+    }
+  };
+
+  const pickStart = (hm: string) => {
+    setStartTime(hm);
+    const e = Math.min(toMinutes(hm) + duration, toMinutes(slotEndHM));
+    setEndTime(fromMinutes(e));
+  };
 
   const reset = () => {
     setTitle("");
     setCompanyName("");
     setMeetingUrl("");
     setDescription("");
+    setDuration(60);
     setStartTime("");
     setEndTime("");
     setSubmitting(false);
@@ -82,8 +155,8 @@ export function ConfirmMeetingDialog({ target, onClose }: Props) {
     "yyyy 年 M 月 d 日 (E)",
     { locale: ja },
   );
-  const slotStartHM = formatJst(target.slotStart, "HH:mm");
-  const slotEndHM = formatJst(target.slotEnd, "HH:mm");
+
+  const durationFitsSlot = (d: Duration) => slotSpanMinutes >= d;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,11 +224,11 @@ export function ConfirmMeetingDialog({ target, onClose }: Props) {
         if (!v) handleClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <ResponsiveModalContent>
         <DialogHeader>
           <DialogTitle>面談を確定</DialogTitle>
           <DialogDescription>
-            候補レンジ内で実際の開始/終了時刻を指定して確定します。
+            候補レンジ内で実際の開始時刻と所要時間を選んで確定します。
           </DialogDescription>
         </DialogHeader>
 
@@ -196,9 +269,58 @@ export function ConfirmMeetingDialog({ target, onClose }: Props) {
               onChange={(e) => setMeetingUrl(e.target.value)}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label>所要時間</Label>
+            <div className="flex gap-2">
+              {([30, 60] as const).map((d) => (
+                <Button
+                  key={d}
+                  type="button"
+                  variant={duration === d ? "default" : "outline"}
+                  size="sm"
+                  disabled={!durationFitsSlot(d)}
+                  onClick={() => applyDuration(d)}
+                >
+                  {d} 分
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>開始時刻を選択</Label>
+            {startOptions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                この候補レンジに {duration} 分は収まりません。
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {startOptions.map((hm) => {
+                  const selected = hm === startTime;
+                  return (
+                    <button
+                      key={hm}
+                      type="button"
+                      onClick={() => pickStart(hm)}
+                      className={cn(
+                        "rounded-md border px-2 py-1 text-xs font-medium tabular-nums transition-colors",
+                        selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-background hover:bg-muted",
+                      )}
+                    >
+                      {hm}〜{fromMinutes(toMinutes(hm) + duration)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="cm-start">開始</Label>
+              <Label htmlFor="cm-start">開始 (微調整)</Label>
               <Input
                 id="cm-start"
                 type="time"
@@ -210,7 +332,7 @@ export function ConfirmMeetingDialog({ target, onClose }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cm-end">終了</Label>
+              <Label htmlFor="cm-end">終了 (微調整)</Label>
               <Input
                 id="cm-end"
                 type="time"
@@ -242,7 +364,7 @@ export function ConfirmMeetingDialog({ target, onClose }: Props) {
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
+      </ResponsiveModalContent>
     </Dialog>
   );
 }

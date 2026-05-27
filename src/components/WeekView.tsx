@@ -25,6 +25,7 @@ import {
   type CellEvent,
 } from "@/lib/calendar-events";
 import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
+import type { EventInfo } from "@/components/EventInfoDialog";
 import { CalendarHeader, type ViewMode } from "@/components/CalendarHeader";
 
 type Props = {
@@ -33,6 +34,7 @@ type Props = {
   onSelectedDateChange: (date: Date) => void;
   onProposalConfirm: (target: ConfirmTarget) => void;
   onMeetingOpen: (meeting: Meeting) => void;
+  onEventInfoOpen: (info: EventInfo) => void;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
 };
@@ -81,6 +83,7 @@ export function WeekView({
   onSelectedDateChange,
   onProposalConfirm,
   onMeetingOpen,
+  onEventInfoOpen,
   view,
   onViewChange,
 }: Props) {
@@ -127,6 +130,24 @@ export function WeekView({
       });
     } else if (e.type === "meeting") {
       onMeetingOpen(e.meeting);
+    } else if (e.type === "busy") {
+      onEventInfoOpen({
+        type: "busy",
+        summary: e.summary,
+        start: e.start,
+        end: e.end,
+        allDay: e.allDay,
+        description: e.description,
+        location: e.location,
+        meetUrl: e.meetUrl,
+      });
+    } else {
+      onEventInfoOpen({
+        type: "holiday",
+        name: e.name,
+        start: e.start,
+        end: e.end,
+      });
     }
   };
 
@@ -200,15 +221,17 @@ export function WeekView({
                   className="min-h-[1.5rem] flex-1 border-r px-1 py-0.5"
                 >
                   {dayItems.map((e) => (
-                    <div
+                    <button
                       key={e.key}
+                      type="button"
+                      onClick={() => onClickEvent(e)}
                       className={cn(
-                        "truncate rounded px-1 leading-4",
+                        "block w-full truncate rounded px-1 text-left leading-4 transition-opacity hover:opacity-80",
                         cellEventColorClass(e.type),
                       )}
                     >
                       {eventTitle(e)}
-                    </div>
+                    </button>
                   ))}
                 </div>
               );
@@ -264,19 +287,15 @@ export function WeekView({
                 {dayTimedEvents.map((e) => {
                   const style = computeStyle(e, dayStart);
                   if (!style) return null;
-                  const clickable =
-                    e.type === "proposal" || e.type === "meeting";
                   return (
                     <button
                       key={e.key}
                       type="button"
-                      disabled={!clickable}
                       onClick={() => onClickEvent(e)}
                       style={style}
                       className={cn(
-                        "absolute left-0.5 right-0.5 overflow-hidden rounded px-1 py-0.5 text-left text-[10px] leading-tight shadow-sm transition-opacity",
+                        "absolute left-0.5 right-0.5 overflow-hidden rounded px-1 py-0.5 text-left text-[10px] leading-tight shadow-sm transition-opacity hover:opacity-80",
                         cellEventColorClass(e.type),
-                        clickable ? "hover:opacity-80" : "cursor-default",
                       )}
                     >
                       <div className="font-medium">{eventTitle(e)}</div>

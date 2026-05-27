@@ -23,7 +23,6 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { endOfJstDay, formatJst, startOfJstDay } from "@/lib/datetime";
 import { useBusyEvents } from "@/lib/use-busy-events";
@@ -37,6 +36,7 @@ import {
   type CellEvent,
 } from "@/lib/calendar-events";
 import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
+import type { EventInfo } from "@/components/EventInfoDialog";
 import { CalendarHeader, type ViewMode } from "@/components/CalendarHeader";
 
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -55,6 +55,7 @@ type DayCellProps = {
   onSelect: (d: Date) => void;
   onProposalConfirm: (target: ConfirmTarget) => void;
   onMeetingOpen: (meeting: Meeting) => void;
+  onEventInfoOpen: (info: EventInfo) => void;
 };
 
 function DayCell({
@@ -65,6 +66,7 @@ function DayCell({
   onSelect,
   onProposalConfirm,
   onMeetingOpen,
+  onEventInfoOpen,
 }: DayCellProps) {
   const inMonth = isSameMonth(date, cursor);
   const today = isToday(date);
@@ -161,53 +163,58 @@ function DayCell({
                     : e.type === "meeting"
                       ? `${e.title} / ${e.companyName}`
                       : `祝日: ${e.name}`;
+              const onRowClick = () => {
+                if (e.type === "proposal") {
+                  onProposalConfirm({
+                    proposalId: e.proposalId,
+                    slotId: e.slotId,
+                    label: e.label,
+                    slotStart: e.start,
+                    slotEnd: e.end,
+                  });
+                } else if (e.type === "meeting") {
+                  onMeetingOpen(e.meeting);
+                } else if (e.type === "busy") {
+                  onEventInfoOpen({
+                    type: "busy",
+                    summary: e.summary,
+                    start: e.start,
+                    end: e.end,
+                    allDay: e.allDay,
+                    description: e.description,
+                    location: e.location,
+                    meetUrl: e.meetUrl,
+                  });
+                } else {
+                  onEventInfoOpen({
+                    type: "holiday",
+                    name: e.name,
+                    start: e.start,
+                    end: e.end,
+                  });
+                }
+              };
               return (
-                <li
-                  key={e.key}
-                  className={cn(
-                    "flex flex-col gap-0.5 rounded border px-2 py-1.5",
-                    e.type === "busy" && "bg-card",
-                    e.type === "proposal" &&
-                      "border-amber-300 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30",
-                    e.type === "meeting" &&
-                      "border-sky-300 bg-sky-50 dark:border-sky-800/60 dark:bg-sky-950/30",
-                    e.type === "holiday" &&
-                      "border-emerald-300 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-950/30",
-                  )}
-                >
-                  <span className="text-xs font-medium">{title}</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {time}
-                  </span>
-                  {e.type === "proposal" && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="mt-1 self-start"
-                      onClick={() =>
-                        onProposalConfirm({
-                          proposalId: e.proposalId,
-                          slotId: e.slotId,
-                          label: e.label,
-                          slotStart: e.start,
-                          slotEnd: e.end,
-                        })
-                      }
-                    >
-                      この候補で確定
-                    </Button>
-                  )}
-                  {e.type === "meeting" && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="mt-1 self-start"
-                      onClick={() => onMeetingOpen(e.meeting)}
-                    >
-                      詳細 / 編集
-                    </Button>
-                  )}
+                <li key={e.key}>
+                  <button
+                    type="button"
+                    onClick={onRowClick}
+                    className={cn(
+                      "flex w-full flex-col gap-0.5 rounded border px-2 py-1.5 text-left transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:brightness-110",
+                      e.type === "busy" && "bg-card",
+                      e.type === "proposal" &&
+                        "border-amber-300 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30",
+                      e.type === "meeting" &&
+                        "border-sky-300 bg-sky-50 dark:border-sky-800/60 dark:bg-sky-950/30",
+                      e.type === "holiday" &&
+                        "border-emerald-300 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-950/30",
+                    )}
+                  >
+                    <span className="text-xs font-medium">{title}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {time}
+                    </span>
+                  </button>
                 </li>
               );
             })}
@@ -224,6 +231,7 @@ type Props = {
   onSelectedDateChange: (date: Date) => void;
   onProposalConfirm: (target: ConfirmTarget) => void;
   onMeetingOpen: (meeting: Meeting) => void;
+  onEventInfoOpen: (info: EventInfo) => void;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
 };
@@ -234,6 +242,7 @@ export function MonthView({
   onSelectedDateChange,
   onProposalConfirm,
   onMeetingOpen,
+  onEventInfoOpen,
   view,
   onViewChange,
 }: Props) {
@@ -308,6 +317,7 @@ export function MonthView({
             onSelect={onSelectedDateChange}
             onProposalConfirm={onProposalConfirm}
             onMeetingOpen={onMeetingOpen}
+            onEventInfoOpen={onEventInfoOpen}
           />
         ))}
       </div>

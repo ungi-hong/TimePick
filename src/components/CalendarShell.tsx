@@ -24,6 +24,10 @@ import {
   ProposalManageDialog,
   type ManagedProposal,
 } from "@/components/ProposalManageDialog";
+import {
+  EventInfoDialog,
+  type EventInfo,
+} from "@/components/EventInfoDialog";
 import type { Meeting } from "@/lib/use-meetings";
 
 type Props = {
@@ -37,6 +41,7 @@ export function CalendarShell({ calendarConnected }: Props) {
   const [proposalTarget, setProposalTarget] = useState<ManagedProposal | null>(
     null,
   );
+  const [infoTarget, setInfoTarget] = useState<EventInfo | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const openProposalFromMobile = (p: ManagedProposal) => {
@@ -46,6 +51,10 @@ export function CalendarShell({ calendarConnected }: Props) {
   const openMeetingFromMobile = (m: Meeting) => {
     setMobileOpen(false);
     setMeetingTarget(m);
+  };
+  const openConfirmFromMobile = (t: ConfirmTarget) => {
+    setMobileOpen(false);
+    setConfirmTarget(t);
   };
 
   return (
@@ -59,6 +68,7 @@ export function CalendarShell({ calendarConnected }: Props) {
         <SidebarLists
           onProposalOpen={setProposalTarget}
           onMeetingOpen={setMeetingTarget}
+          onSlotConfirm={setConfirmTarget}
         />
       </aside>
 
@@ -84,6 +94,7 @@ export function CalendarShell({ calendarConnected }: Props) {
                 <SidebarLists
                   onProposalOpen={openProposalFromMobile}
                   onMeetingOpen={openMeetingFromMobile}
+                  onSlotConfirm={openConfirmFromMobile}
                 />
               </div>
             </SheetContent>
@@ -99,6 +110,7 @@ export function CalendarShell({ calendarConnected }: Props) {
               onSelectedDateChange={setSelectedDate}
               onProposalConfirm={setConfirmTarget}
               onMeetingOpen={setMeetingTarget}
+              onEventInfoOpen={setInfoTarget}
             />
           </div>
         </div>
@@ -116,6 +128,7 @@ export function CalendarShell({ calendarConnected }: Props) {
         proposal={proposalTarget}
         onClose={() => setProposalTarget(null)}
       />
+      <EventInfoDialog info={infoTarget} onClose={() => setInfoTarget(null)} />
     </div>
   );
 }

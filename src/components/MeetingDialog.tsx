@@ -10,16 +10,17 @@ import { ExternalLink, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveModalContent } from "@/components/ui/responsive-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatJst } from "@/lib/datetime";
+import { renderLinkified } from "@/lib/linkify";
 import type { Meeting } from "@/lib/use-meetings";
 
 type Props = {
@@ -130,7 +131,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
         if (!v) handleClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <ResponsiveModalContent>
         <DialogHeader>
           <DialogTitle>{editing ? "面談を編集" : "確定済みの面談"}</DialogTitle>
           <DialogDescription>
@@ -170,9 +171,9 @@ export function MeetingDialog({ meeting, onClose }: Props) {
               </p>
             )}
             {meeting.description && (
-              <p className="whitespace-pre-wrap rounded-md border bg-muted/30 px-3 py-2 text-xs">
-                {meeting.description}
-              </p>
+              <div className="whitespace-pre-wrap rounded-md border bg-muted/30 px-3 py-2 text-xs">
+                {renderLinkified(meeting.description)}
+              </div>
             )}
 
             <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
@@ -285,7 +286,7 @@ export function MeetingDialog({ meeting, onClose }: Props) {
             </DialogFooter>
           </form>
         )}
-      </DialogContent>
+      </ResponsiveModalContent>
     </Dialog>
   );
 }

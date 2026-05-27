@@ -9,6 +9,7 @@ import { DayView } from "@/components/DayView";
 import { ScheduleView } from "@/components/ScheduleView";
 import type { ViewMode } from "@/components/CalendarHeader";
 import type { ConfirmTarget } from "@/components/ConfirmMeetingDialog";
+import type { EventInfo } from "@/components/EventInfoDialog";
 import type { Meeting } from "@/lib/use-meetings";
 
 type Props = {
@@ -17,6 +18,7 @@ type Props = {
   onSelectedDateChange: (date: Date) => void;
   onProposalConfirm: (target: ConfirmTarget) => void;
   onMeetingOpen: (meeting: Meeting) => void;
+  onEventInfoOpen: (info: EventInfo) => void;
 };
 
 export function CalendarView(props: Props) {
