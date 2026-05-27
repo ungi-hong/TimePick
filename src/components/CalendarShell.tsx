@@ -2,10 +2,19 @@
 
 import { useState } from "react";
 import { startOfDay } from "date-fns";
-import { MiniCalendar } from "@/components/MiniCalendar";
-import { MonthCalendar } from "@/components/MonthCalendar";
-import { SidebarLists } from "@/components/SidebarLists";
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { MiniCalendar } from "@/components/MiniCalendar";
+import { CalendarView } from "@/components/CalendarView";
+import { SidebarLists } from "@/components/SidebarLists";
 import {
   ConfirmMeetingDialog,
   type ConfirmTarget,
@@ -28,6 +37,16 @@ export function CalendarShell({ calendarConnected }: Props) {
   const [proposalTarget, setProposalTarget] = useState<ManagedProposal | null>(
     null,
   );
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const openProposalFromMobile = (p: ManagedProposal) => {
+    setMobileOpen(false);
+    setProposalTarget(p);
+  };
+  const openMeetingFromMobile = (m: Meeting) => {
+    setMobileOpen(false);
+    setMeetingTarget(m);
+  };
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -44,9 +63,37 @@ export function CalendarShell({ calendarConnected }: Props) {
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden bg-muted/30">
+        <div className="flex items-center gap-2 border-b bg-background px-3 py-2 md:hidden">
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="候補リストを開く"
+                />
+              }
+            >
+              <Menu className="h-5 w-5" />
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-0 sm:max-w-72">
+              <SheetHeader className="border-b">
+                <SheetTitle>候補 / 確定済み</SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto">
+                <SidebarLists
+                  onProposalOpen={openProposalFromMobile}
+                  onMeetingOpen={openMeetingFromMobile}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+          <span className="text-sm font-medium">候補 / 確定済み</span>
+        </div>
+
         <div className="flex flex-1 flex-col overflow-hidden md:p-4 lg:p-6">
           <div className="flex flex-1 flex-col overflow-hidden bg-background md:rounded-lg md:border md:shadow-sm">
-            <MonthCalendar
+            <CalendarView
               calendarConnected={calendarConnected}
               selectedDate={selectedDate}
               onSelectedDateChange={setSelectedDate}

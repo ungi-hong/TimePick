@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { hasCalendarConnection } from "@/lib/calendar-connection";
 import { CalendarShell } from "@/components/CalendarShell";
 import { ProposalGenerateDialog } from "@/components/ProposalGenerateDialog";
+import { StaleProposalsBanner } from "@/components/StaleProposalsBanner";
 
 export default async function Home() {
   const session = await auth();
@@ -53,6 +54,7 @@ export default async function Home() {
         </div>
       </header>
 
+      <StaleProposalsBanner />
       <CalendarShell calendarConnected={connected} />
     </main>
   );
