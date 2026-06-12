@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 export const CALENDAR_SCOPES = [
@@ -33,4 +34,44 @@ export const clearCalendarConnection = async (userId: string): Promise<void> => 
       id_token: null,
     },
   });
+};
+
+// リフレッシュトークンが失効 (invalid_grant) したときに google-calendar 層が投げる。
+// route 側で 412 (再連携要求) に変換する。
+export class CalendarAuthError extends Error {
+  constructor(options?: { cause?: unknown }) {
+    super("calendar_auth_invalid", options);
+    this.name = "CalendarAuthError";
+  }
+}
+
+// gaxios / googleapis のトークン更新失敗 (invalid_grant) を判定する。
+export const isInvalidGrantError = (err: unknown): boolean => {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as {
+    response?: { data?: { error?: unknown } };
+    message?: unknown;
+  };
+  return e.response?.data?.error === "invalid_grant" || e.message === "invalid_grant";
+};
+
+// route の catch で使う。CalendarAuthError なら接続情報をクリアして 412 を返す。
+// 該当しなければ null を返すので、呼び出し側で通常のエラー処理を続ける。
+export const reauthResponseIfNeeded = async (
+  userId: string,
+  err: unknown,
+): Promise<NextResponse | null> => {
+  if (!(err instanceof CalendarAuthError)) return null;
+  await clearCalendarConnection(userId);
+  return NextResponse.json(
+    { error: "calendar_not_connected", reason: "reauth_required" },
+    { status: 412 },
+  );
+};
+
+// gaxios エラーは config/response にリフレッシュトークンを含むため丸ごとログに出すと漏えいする。
+// message と stack のみに絞る。
+export const safeErrorLog = (err: unknown): string => {
+  if (err instanceof Error) return err.stack ?? err.message;
+  return String(err);
 };

@@ -6,6 +6,7 @@ import {
   deleteMeetingEvent,
   patchMeetingEvent,
 } from "@/lib/google-calendar";
+import { safeErrorLog } from "@/lib/calendar-connection";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -89,7 +90,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         end: next.endAt,
       });
     } catch (err) {
-      console.error("[/api/meetings/:id PATCH] google sync failed", err);
+      console.error("[/api/meetings/:id PATCH] google sync failed", safeErrorLog(err));
       await prisma.meeting.update({
         where: { id },
         data: {
@@ -143,7 +144,10 @@ export async function DELETE(_req: Request, ctx: Ctx) {
         typeof err === "object" && err !== null && "code" in err
           ? Number((err as { code: number }).code)
           : null;
-      console.error("[/api/meetings/:id DELETE] google delete failed", err);
+      console.error(
+        "[/api/meetings/:id DELETE] google delete failed",
+        safeErrorLog(err),
+      );
       if (code !== 403) {
         return NextResponse.json(
           { error: "google_delete_failed", code },

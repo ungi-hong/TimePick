@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUserId } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { hasCalendarConnection } from "@/lib/calendar-connection";
+import { hasCalendarConnection, safeErrorLog } from "@/lib/calendar-connection";
 import { insertProposalEvent } from "@/lib/google-calendar";
 
 const SaveSchema = z.object({
@@ -69,7 +69,10 @@ export async function POST(req: Request) {
             });
           }
         } catch (err) {
-          console.error("[/api/proposals POST] insertProposalEvent failed", err);
+          console.error(
+            "[/api/proposals POST] insertProposalEvent failed",
+            safeErrorLog(err),
+          );
           failedSlotIds.push(slot.id);
         }
       }),

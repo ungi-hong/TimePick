@@ -6,6 +6,7 @@ import {
   deleteProposalEvent,
   patchProposalEventLabel,
 } from "@/lib/google-calendar";
+import { safeErrorLog } from "@/lib/calendar-connection";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -55,7 +56,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
           } catch (err) {
             console.error(
               "[/api/proposals/:id PATCH] patchProposalEventLabel failed",
-              err,
+              safeErrorLog(err),
             );
             return false;
           }
@@ -97,7 +98,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
         } catch (err) {
           console.error(
             "[/api/proposals/:id DELETE] deleteProposalEvent failed",
-            err,
+            safeErrorLog(err),
           );
         }
       }),

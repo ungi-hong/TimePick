@@ -6,7 +6,7 @@ import {
   deleteProposalEvent,
   insertMeetingEvent,
 } from "@/lib/google-calendar";
-import { hasCalendarConnection } from "@/lib/calendar-connection";
+import { hasCalendarConnection, safeErrorLog } from "@/lib/calendar-connection";
 
 const UrlOrEmpty = z
   .string()
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
       });
     }
   } catch (err) {
-    console.error("[/api/meetings] insertMeetingEvent failed", err);
+    console.error("[/api/meetings] insertMeetingEvent failed", safeErrorLog(err));
     // DB ロールバック: Meeting を削除し proposal を OPEN に戻す
     await prisma.$transaction(async (tx) => {
       await tx.meeting.delete({ where: { id: meeting.id } });
@@ -125,7 +125,10 @@ export async function POST(req: Request) {
         try {
           await deleteProposalEvent(userId, s.googleEventId!);
         } catch (err) {
-          console.error("[/api/meetings POST] deleteProposalEvent failed", err);
+          console.error(
+            "[/api/meetings POST] deleteProposalEvent failed",
+            safeErrorLog(err),
+          );
         }
       }),
   );

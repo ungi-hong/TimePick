@@ -1,6 +1,22 @@
 import { google, type calendar_v3 } from "googleapis";
 import { prisma } from "@/lib/db";
-import { getGoogleAccount } from "@/lib/calendar-connection";
+import {
+  getGoogleAccount,
+  CalendarAuthError,
+  isInvalidGrantError,
+} from "@/lib/calendar-connection";
+
+// Google API 呼び出しをラップし、トークン更新失敗 (invalid_grant) を
+// CalendarAuthError に正規化する。トークン更新は events.* 呼び出し中に
+// 遅延実行されるため、各呼び出しをこのヘルパーで包む。
+const callCalendar = async <T>(fn: () => Promise<T>): Promise<T> => {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isInvalidGrantError(err)) throw new CalendarAuthError({ cause: err });
+    throw err;
+  }
+};
 
 export type BusyEvent = {
   start: string; // ISO 8601 (+09:00)
@@ -91,15 +107,17 @@ export const listBusyEvents = async (
   const calendar = await getCalendarClient(userId);
   if (!calendar) return [];
 
-  const { data } = await calendar.events.list({
-    calendarId: "primary",
-    timeMin: from.toISOString(),
-    timeMax: to.toISOString(),
-    singleEvents: true,
-    orderBy: "startTime",
-    maxResults: 2500,
-    timeZone: "Asia/Tokyo",
-  });
+  const { data } = await callCalendar(() =>
+    calendar.events.list({
+      calendarId: "primary",
+      timeMin: from.toISOString(),
+      timeMax: to.toISOString(),
+      singleEvents: true,
+      orderBy: "startTime",
+      maxResults: 2500,
+      timeZone: "Asia/Tokyo",
+    }),
+  );
 
   return (data.items ?? [])
     .filter((e) => e.status !== "cancelled" && (e.start?.dateTime || e.start?.date))
@@ -122,10 +140,12 @@ export const insertMeetingEvent = async (
   const calendar = await getCalendarClient(userId);
   if (!calendar) return null;
 
-  const { data } = await calendar.events.insert({
-    calendarId: "primary",
-    requestBody: toEventBody(input),
-  });
+  const { data } = await callCalendar(() =>
+    calendar.events.insert({
+      calendarId: "primary",
+      requestBody: toEventBody(input),
+    }),
+  );
   return data.id ?? null;
 };
 
@@ -146,11 +166,13 @@ export const patchMeetingEvent = async (
   if (input.end)
     body.end = { dateTime: input.end.toISOString(), timeZone: "Asia/Tokyo" };
 
-  await calendar.events.patch({
-    calendarId: "primary",
-    eventId,
-    requestBody: body,
-  });
+  await callCalendar(() =>
+    calendar.events.patch({
+      calendarId: "primary",
+      eventId,
+      requestBody: body,
+    }),
+  );
   return true;
 };
 
@@ -162,7 +184,9 @@ export const deleteMeetingEvent = async (
   if (!calendar) return false;
 
   try {
-    await calendar.events.delete({ calendarId: "primary", eventId });
+    await callCalendar(() =>
+      calendar.events.delete({ calendarId: "primary", eventId }),
+    );
     return true;
   } catch (err) {
     if (
@@ -203,10 +227,12 @@ export const insertProposalEvent = async (
   const calendar = await getCalendarClient(userId);
   if (!calendar) return null;
 
-  const { data } = await calendar.events.insert({
-    calendarId: "primary",
-    requestBody: toProposalEventBody(input),
-  });
+  const { data } = await callCalendar(() =>
+    calendar.events.insert({
+      calendarId: "primary",
+      requestBody: toProposalEventBody(input),
+    }),
+  );
   return data.id ?? null;
 };
 
@@ -218,11 +244,13 @@ export const patchProposalEventLabel = async (
   const calendar = await getCalendarClient(userId);
   if (!calendar) return false;
 
-  await calendar.events.patch({
-    calendarId: "primary",
-    eventId,
-    requestBody: { summary: `[候補] ${label}` },
-  });
+  await callCalendar(() =>
+    calendar.events.patch({
+      calendarId: "primary",
+      eventId,
+      requestBody: { summary: `[候補] ${label}` },
+    }),
+  );
   return true;
 };
 

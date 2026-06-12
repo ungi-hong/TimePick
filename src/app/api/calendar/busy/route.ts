@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireUserId } from "@/lib/api-auth";
-import { hasCalendarConnection } from "@/lib/calendar-connection";
+import {
+  hasCalendarConnection,
+  reauthResponseIfNeeded,
+  safeErrorLog,
+} from "@/lib/calendar-connection";
 import { listBusyEvents } from "@/lib/google-calendar";
 import { prisma } from "@/lib/db";
 
@@ -65,7 +69,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ events: filtered });
   } catch (err) {
-    console.error("[/api/calendar/busy] failed", err);
+    const reauth = await reauthResponseIfNeeded(userId, err);
+    if (reauth) return reauth;
+    console.error("[/api/calendar/busy] failed", safeErrorLog(err));
     return NextResponse.json({ error: "calendar_fetch_failed" }, { status: 502 });
   }
 }

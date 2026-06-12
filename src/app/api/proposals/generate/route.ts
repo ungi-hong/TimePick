@@ -9,7 +9,11 @@ import {
   type AvailabilityExceptionDto,
   type WeeklyHours,
 } from "@/lib/availability";
-import { hasCalendarConnection } from "@/lib/calendar-connection";
+import {
+  hasCalendarConnection,
+  reauthResponseIfNeeded,
+  safeErrorLog,
+} from "@/lib/calendar-connection";
 import { listBusyEvents } from "@/lib/google-calendar";
 import {
   generateProposalCandidates,
@@ -62,25 +66,35 @@ export async function POST(req: Request) {
       note: e.note,
     })) ?? [];
 
-  const [busy, openSlots, meetings] = await Promise.all([
-    listBusyEvents(userId, from, to),
-    prisma.proposalSlot.findMany({
-      where: {
-        proposal: { userId: userId, status: "OPEN" },
-        startAt: { lt: to },
-        endAt: { gt: from },
-      },
-      select: { startAt: true, endAt: true },
-    }),
-    prisma.meeting.findMany({
-      where: {
-        userId: userId,
-        startAt: { lt: to },
-        endAt: { gt: from },
-      },
-      select: { startAt: true, endAt: true },
-    }),
-  ]);
+  let busy: Awaited<ReturnType<typeof listBusyEvents>>;
+  let openSlots: { startAt: Date; endAt: Date }[];
+  let meetings: { startAt: Date; endAt: Date }[];
+  try {
+    [busy, openSlots, meetings] = await Promise.all([
+      listBusyEvents(userId, from, to),
+      prisma.proposalSlot.findMany({
+        where: {
+          proposal: { userId: userId, status: "OPEN" },
+          startAt: { lt: to },
+          endAt: { gt: from },
+        },
+        select: { startAt: true, endAt: true },
+      }),
+      prisma.meeting.findMany({
+        where: {
+          userId: userId,
+          startAt: { lt: to },
+          endAt: { gt: from },
+        },
+        select: { startAt: true, endAt: true },
+      }),
+    ]);
+  } catch (err) {
+    const reauth = await reauthResponseIfNeeded(userId, err);
+    if (reauth) return reauth;
+    console.error("[/api/proposals/generate] failed", safeErrorLog(err));
+    return NextResponse.json({ error: "calendar_fetch_failed" }, { status: 502 });
+  }
 
   const conflicts: ConflictRange[] = [
     ...busy.map((e) => ({ start: new Date(e.start), end: new Date(e.end) })),
